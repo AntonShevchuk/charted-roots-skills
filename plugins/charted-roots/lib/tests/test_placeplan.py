@@ -624,5 +624,116 @@ class Apply(VaultCase):
                             for p in plan.places.values()))
 
 
+POLAND = ("---\ncr_type: place\ncr_id: pol-111-pol-111\ntitle: Poland\n"
+          "place_type: country\nfull_name: Poland\n---\n")
+
+
+class RealNote(VaultCase):
+    """An entry that names an existing note is that note, whatever its status."""
+
+    def _plan(self):
+        plan = _chain()
+        plan.places["poland"].cr_id = "pol-111-pol-111"
+        plan.places["poland"].aliases = ["Polska"]
+        plan.plac["Poland"] = PlacEntry(plac="Poland", place="poland",
+                                        status="approved")
+        return plan
+
+    def _existing(self):
+        return list(vault.iter_notes(self.cfg.places))
+
+    def test_an_approved_parent_with_a_cr_id_keeps_its_note_name(self):
+        self.write(f"{FOLDERS['places']}/Poland.md", POLAND)
+        plan = self._plan()
+        names = placeplan.assign_basenames(plan, self._existing())
+        self.assertEqual(names["poland"], "Poland")
+        self.assertEqual(placeplan.check(plan, self.cfg, self._existing()), [])
+        placeplan.apply_plan(plan, self.cfg, dry=False)
+        text = self.read(f"{FOLDERS['places']}/Lower Silesian Voivodeship.md")
+        self.assertIn('parent_place: "[[Poland]]"', text)
+        self.assertIn("parent_place_id: pol-111-pol-111", text)
+        self.assertNotIn("Poland 2", text)
+        self.assertFalse(os.path.exists(os.path.join(
+            self.root, FOLDERS["places"], "Poland 2.md")))
+
+    def test_an_approved_parent_found_by_file_is_the_real_note(self):
+        self.write(f"{FOLDERS['places']}/Poland.md", POLAND)
+        plan = self._plan()
+        plan.places["poland"].cr_id = ""
+        plan.places["poland"].file = f"{FOLDERS['places']}/Poland.md"
+        names = placeplan.assign_basenames(plan, self._existing(),
+                                           root=self.cfg.root)
+        self.assertEqual(names["poland"], "Poland")
+        self.assertEqual(placeplan.check(plan, self.cfg, self._existing()), [])
+        placeplan.apply_plan(plan, self.cfg, dry=False)
+        self.assertIn('parent_place: "[[Poland]]"', self.read(
+            f"{FOLDERS['places']}/Lower Silesian Voivodeship.md"))
+
+    def test_a_new_alias_and_its_plac_pass_check_in_one_batch(self):
+        placeplan.apply_plan(_chain(), self.cfg, dry=False)
+        plan = placeplan.load(self.root)
+        plan.places["wroclaw"].aliases.append("Wratislavia")
+        plan.plac["Wratislavia, Schlesien"] = PlacEntry(
+            plac="Wratislavia, Schlesien", place="wroclaw", status="approved")
+        self.assertEqual(placeplan.check(plan, self.cfg, self._existing()), [])
+        res = placeplan.apply_plan(plan, self.cfg, dry=False)
+        self.assertEqual(res.aliased, [f"{FOLDERS['places']}/Wrocław.md"])
+        idx = places.load(self.cfg.places,
+                          approved=placeplan.approved_placs(plan))
+        self.assertEqual(idx.find("Wratislavia, Schlesien").basename, "Wrocław")
+
+    def test_an_existing_key_is_never_overwritten_by_extract(self):
+        self.write(f"{FOLDERS['places']}/poland.md",
+                   "---\ncr_type: place\ntitle: Poland\nplace_type: country\n"
+                   "full_name: Poland\n---\n")
+        plan = Plan(places={"poland": PlannedPlace(
+            key="poland", title="Elsewhere", place_type="region")})
+        placeplan.extract(plan, Counter({"Poland": 1}),
+                          places.load(self.cfg.places), root=self.root)
+        self.assertEqual(plan.places["poland"].title, "Elsewhere")
+        self.assertEqual(plan.places["poland"].status, "proposed")
+        self.assertEqual(len(plan.places), 2)
+        self.assertNotEqual(plan.plac["Poland"].place, "poland")
+        self.assertIn(plan.plac["Poland"].place, plan.places)
+
+    def test_extract_after_apply_reuses_the_applied_keys(self):
+        placeplan.apply_plan(_chain(), self.cfg, dry=False)
+        plan = placeplan.load(self.root)
+        placeplan.extract(
+            plan, Counter({"Poland": 2,
+                           "Wrocław, Lower Silesian Voivodeship, Poland": 1,
+                           "Vratislavia, Schlesien": 1}),
+            places.load(self.cfg.places), root=self.root)
+        self.assertEqual(sorted(plan.places),
+                         ["lower-silesia", "poland", "wroclaw"])
+        self.assertEqual(plan.plac["Poland"].place, "poland")
+        self.assertEqual(
+            plan.plac["Wrocław, Lower Silesian Voivodeship, Poland"].place,
+            "wroclaw")
+        self.assertEqual(plan.plac["Vratislavia, Schlesien"].status, "proposed")
+        self.assertEqual(placeplan.check(plan, self.cfg, self._existing()), [])
+        placeplan.save(self.root, plan)
+        res = placeplan.apply_plan(placeplan.load(self.root), self.cfg,
+                                   dry=False)
+        self.assertEqual((res.created, res.aliased), ([], []))
+
+    def test_check_ignores_what_it_cannot_fix_in_existing_notes(self):
+        for name in ("Alpha", "Alpha 2"):
+            self.write(f"{FOLDERS['places']}/{name}.md",
+                       f"---\ncr_type: place\ncr_id: {name[-1]}-111-aaa-111\n"
+                       "title: Alpha\nplace_type: city\n---\n")
+        self.write(f"{FOLDERS['places']}/Typeless.md",
+                   "---\ncr_type: place\ncr_id: typ-111-typ-111\n"
+                   "title: Typeless\n---\n")
+        plan = Plan()
+        placeplan.extract(plan, Counter(), places.load(self.cfg.places),
+                          root=self.root)
+        for n in places.load(self.cfg.places).notes:
+            placeplan._record_note(plan, places.load(self.cfg.places), n,
+                                   self.root)
+        self.assertEqual(len(plan.places), 3)
+        self.assertEqual(placeplan.check(plan, self.cfg, self._existing()), [])
+
+
 if __name__ == "__main__":
     unittest.main()

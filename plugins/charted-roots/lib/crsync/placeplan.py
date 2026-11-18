@@ -161,13 +161,52 @@ class ExtractResult:
     resolved: list[str] = field(default_factory=list)
 
 
+def _same_file(note, file: str, root: str) -> bool:
+    if not file:
+        return False
+    want = os.path.normpath(os.path.join(root, file) if root else file)
+    got = os.path.normpath(note.path)
+    return got == want or (
+        not root and not os.path.isabs(want) and got.endswith(os.sep + want))
+
+
+def real_note(place: PlannedPlace, existing: list, root: str = ""):
+    """The existing note a plan entry names, or None: by `cr_id`, then `file`.
+
+    One answer for every status, so `check`, `assign_basenames`, `apply_plan`
+    and `extract` agree on which entries already have a note.
+    """
+    if place.cr_id:
+        for n in existing:
+            if n.scalar("cr_id") == place.cr_id:
+                return n
+    if place.file:
+        for n in existing:
+            if _same_file(n, place.file, root):
+                return n
+    return None
+
+
 def _record_note(plan: Plan, index: places.Index, note, root: str) -> str:
-    """Record an existing Place note, and its ancestors, as created places."""
+    """Record an existing Place note, and its ancestors, as created places.
+
+    A note the plan already has an entry for (by `cr_id`, then `file`) keeps
+    that entry's key; an entry is never overwritten.
+    """
     chain = [note] + index.ancestors(note)
-    keys = [n.scalar("cr_id") or n.basename for n in chain]
-    for i, n in enumerate(chain):
-        if keys[i] in plan.places:
-            continue
+    keys, fresh = [], []
+    for n in chain:
+        found = next((k for k, p in plan.places.items()
+                      if real_note(p, [n], root) is not None), None)
+        if found is None:
+            base = found = n.scalar("cr_id") or n.basename
+            i = 2
+            while found in plan.places or found in keys:
+                found, i = f"{base} {i}", i + 1
+            fresh.append(len(keys))
+        keys.append(found)
+    for i in fresh:
+        n = chain[i]
         path = os.path.relpath(n.path, root) if root else n.path
         plan.places[keys[i]] = PlannedPlace(
             key=keys[i], title=n.scalar("title") or n.basename,
@@ -271,17 +310,22 @@ def render_note(place: PlannedPlace, plan: Plan, basenames: dict,
     return text
 
 
-def _validate(plan: Plan, cfg: config.Config) -> list[str]:
+def _validate(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
     problems = []
     types = config.PLACE_TYPES | cfg.custom_place_types
     reported = set()
+    # Entries `extract` recorded from notes already in the vault describe the
+    # vault as it is; the plan cannot fix them, so the type and duplicate-title
+    # rules skip them.
+    recorded = {k for k, p in plan.places.items() if p.status == "created"
+                and real_note(p, existing, cfg.root) is not None}
     for key, p in plan.places.items():
         if p.status not in STATUSES:
             problems.append(f"{key}: unknown status {p.status!r}")
         if (not isinstance(p.aliases, list)
                 or not all(isinstance(a, str) for a in p.aliases)):
             problems.append(f"{key}: aliases must be a list of strings")
-        if p.place_type not in types:
+        if p.place_type not in types and key not in recorded:
             problems.append(f"{key}: place_type {p.place_type!r} is not valid")
         if p.parent and p.parent not in plan.places:
             problems.append(f"{key}: parent {p.parent!r} not in plan")
@@ -297,6 +341,8 @@ def _validate(plan: Plan, cfg: config.Config) -> list[str]:
                     f"{key}: parent cycle {' -> '.join(loop + [cur.key])}")
     firsts: dict = {}
     for key, p in plan.places.items():
+        if key in recorded:
+            continue
         slot = (p.parent, places.key(p.title))
         if slot in firsts:
             problems.append(
@@ -320,42 +366,46 @@ def _validate(plan: Plan, cfg: config.Config) -> list[str]:
     return problems
 
 
-def _existing_note(place: PlannedPlace, existing: list, cfg: config.Config):
-    for n in existing:
-        if place.cr_id and n.scalar("cr_id") == place.cr_id:
-            return n
-    if place.file:
-        want = os.path.normpath(os.path.join(cfg.root, place.file))
-        for n in existing:
-            if os.path.normpath(n.path) == want:
-                return n
-    return None
-
-
-def assign_basenames(plan: Plan, existing: list) -> dict:
+def assign_basenames(plan: Plan, existing: list, root: str = "") -> dict:
     """Plan key -> note basename, for every place in the plan.
 
-    A created place keeps its note's name. The rest are named in a fixed
-    order, approved before proposed and otherwise in plan order, each taking
-    a name no existing note or earlier place holds. `check` and `apply_plan`
-    both call this, so the names they use cannot differ.
+    An entry whose note exists (see `real_note`) keeps that note's name, in
+    any status; a created entry whose note is missing keeps its file's name.
+    The rest are named in a fixed order, approved before proposed and
+    otherwise in plan order, each taking a name no existing note or earlier
+    place holds. `check` and `apply_plan` both call this, so the names they
+    use cannot differ.
     """
     taken = {n.basename for n in existing}
     out = {}
     for key, p in plan.places.items():
-        if p.status != "created":
-            continue
-        note = next((n for n in existing
-                     if p.cr_id and n.scalar("cr_id") == p.cr_id), None)
-        out[key] = (note.basename if note is not None
-                    else os.path.splitext(os.path.basename(p.file))[0]
-                    or p.title)
-    pending = [k for k, p in plan.places.items() if p.status != "created"]
+        note = real_note(p, existing, root)
+        if note is not None:
+            out[key] = note.basename
+        elif p.status == "created":
+            out[key] = (os.path.splitext(os.path.basename(p.file))[0]
+                        or p.title)
+    pending = [k for k in plan.places if k not in out]
     pending.sort(key=lambda k: plan.places[k].status != "approved")
     for key in pending:
         out[key] = basename_for(plan.places[key], plan, taken)
         taken.add(out[key])
     return out
+
+
+def _with_aliases(note, want: list):
+    """An in-memory copy of `note` with the plan's aliases merged in."""
+    if not isinstance(want, list):
+        return note
+    merged = _merged_aliases(note.as_list("aliases"), want)
+    if merged == note.as_list("aliases"):
+        return note
+    copy = vault.parse_text(note.text(), note.path)
+    try:
+        copy.set("aliases", merged)
+    except ValueError:
+        return note
+    return copy
 
 
 def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
@@ -365,32 +415,36 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
     looked up in the vault as it will be after `apply`, must land on its own
     planned Place and on no other.
     """
-    problems = _validate(plan, cfg)
+    problems = _validate(plan, cfg, existing)
 
-    # Note names and ids: real for created places, simulated for the rest.
-    basenames = assign_basenames(plan, existing)
+    # Note names and ids: real where the entry has a note, simulated for the
+    # rest. A real note is indexed with the plan's aliases overlaid, as it
+    # will be once `apply` has added them.
+    basenames = assign_basenames(plan, existing, cfg.root)
     taken_ids = {n.scalar("cr_id") for n in existing if n.scalar("cr_id")}
     taken_ids |= {p.cr_id for p in plan.places.values() if p.cr_id}
     cr_ids, real, fresh, pending = {}, {}, {}, []
     for key, p in plan.places.items():
-        if p.status != "created":
-            pending.append(key)
-            continue
-        note = _existing_note(p, existing, cfg)
+        note = real_note(p, existing, cfg.root)
         if note is None:
-            problems.append(f"{key}: created, but its note was not found")
+            if p.status == "created":
+                problems.append(f"{key}: created, but its note was not found")
+            else:
+                pending.append(key)
             continue
-        real[key] = note
         cr_ids[key] = note.scalar("cr_id") or p.cr_id
+        real[key] = (_with_aliases(note, p.aliases)
+                     if p.status in {"approved", "created"} else note)
     for key in pending:
         cr_ids[key] = create.mint_cr_id(taken_ids)
+    for key, p in plan.places.items():
+        if p.status == "approved" and p.parent in plan.places and (
+                plan.places[p.parent].status not in {"approved", "created"}):
+            problems.append(
+                f"{key}: approved, but parent {p.parent!r} is not")
     for key in pending:
         p = plan.places[key]
         if p.status == "approved":
-            if p.parent in plan.places and plan.places[p.parent].status not in {
-                    "approved", "created"}:
-                problems.append(
-                    f"{key}: approved, but parent {p.parent!r} is not")
             fresh[key] = vault.parse_text(
                 render_note(p, plan, basenames, cr_ids),
                 os.path.join(cfg.places, basenames[key] + ".md"))
@@ -415,8 +469,9 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
 
     # Every approved string must resolve to its own planned place.
     approved = approved_placs(plan)
-    index = places.Index(list(existing) + list(fresh.values()),
-                         approved=approved)
+    on_disk = {n.path: n for n in real.values()}
+    index = places.Index([on_disk.get(n.path, n) for n in existing]
+                         + list(fresh.values()), approved=approved)
     expected = {**real, **fresh}
     for plac, e in plan.plac.items():
         if places.key(plac) not in approved or e.place not in expected:
@@ -461,7 +516,7 @@ def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
     """
     res = ApplyResult()
     existing = list(vault.iter_notes(cfg.places))
-    basenames = assign_basenames(plan, existing)
+    basenames = assign_basenames(plan, existing, cfg.root)
     by_id = {n.scalar("cr_id"): n for n in existing if n.scalar("cr_id")}
 
     taken_ids = set(by_id)
@@ -475,31 +530,34 @@ def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
     # Stable, so plan order holds within a depth.
     todo.sort(key=lambda p: len(_chain(plan, p)))
 
-    cr_ids = {k: p.cr_id for k, p in plan.places.items()
-              if p.status == "created" and p.cr_id}
-    notes = {}
-    for p in todo:
-        note = by_id.get(p.cr_id) if p.cr_id else None
+    notes, cr_ids = {}, {}
+    for key, p in plan.places.items():
+        note = real_note(p, existing, cfg.root)
         if note is not None:
-            notes[p.key] = note
-            cr_ids[p.key] = p.cr_id
-        else:
+            notes[key] = note
+            cr_ids[key] = note.scalar("cr_id") or p.cr_id
+        elif p.status == "created" and p.cr_id:
+            cr_ids[key] = p.cr_id
+    for p in todo:
+        if p.key not in notes:
             cr_ids[p.key] = create.mint_cr_id(taken_ids)
 
     def rel(path: str) -> str:
         return os.path.relpath(path, cfg.root).replace(os.sep, "/")
 
+    def add_aliases(note, want) -> None:
+        merged = _merged_aliases(note.as_list("aliases"), want)
+        if merged != note.as_list("aliases"):
+            res.aliased.append(rel(note.path))
+            if not dry:
+                note.set("aliases", merged)
+                note.save()
+
     handled = {}
     for p in todo:
         if p.key in notes:
-            note = notes[p.key]
-            merged = _merged_aliases(note.as_list("aliases"), p.aliases)
-            if merged != note.as_list("aliases"):
-                res.aliased.append(rel(note.path))
-                if not dry:
-                    note.set("aliases", merged)
-                    note.save()
-            handled[p.key] = rel(note.path)
+            add_aliases(notes[p.key], p.aliases)
+            handled[p.key] = rel(notes[p.key].path)
         else:
             path = os.path.join(cfg.places, basenames[p.key] + ".md")
             res.created.append(rel(path))
@@ -510,17 +568,8 @@ def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
 
     # A created place whose note exists may have gained aliases in the plan.
     for p in plan.places.values():
-        if p.status != "created":
-            continue
-        note = _existing_note(p, existing, cfg)
-        if note is None:
-            continue
-        merged = _merged_aliases(note.as_list("aliases"), p.aliases)
-        if merged != note.as_list("aliases"):
-            res.aliased.append(rel(note.path))
-            if not dry:
-                note.set("aliases", merged)
-                note.save()
+        if p.status == "created" and p.key in notes:
+            add_aliases(notes[p.key], p.aliases)
 
     if not dry and handled:
         for key, path in handled.items():
