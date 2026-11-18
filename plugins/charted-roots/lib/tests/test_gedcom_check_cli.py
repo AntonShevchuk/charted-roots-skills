@@ -80,6 +80,7 @@ class Cli(CliCase):
         code, out, _ = self.run_cli("--ged", self.put(TWO_SAME_BIRTHS),
                                     "--only", "places")
         self.assertEqual(code, 0)
+        self.assertIn("No findings.", out)
 
     def test_missing_file_exits_2(self):
         path = os.path.join(self.dir, "nope.ged")
