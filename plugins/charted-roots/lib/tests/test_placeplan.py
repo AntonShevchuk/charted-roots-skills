@@ -569,6 +569,39 @@ class Apply(VaultCase):
                 "  - breslau\n", "  - breslau\n  - Wratislavia\n"))
         self.assertEqual(plan.places["wroclaw"].status, "created")
 
+    def test_a_created_entry_gains_aliases_through_check_and_apply(self):
+        text = ("---\ncr_type: place\ncr_id: wro-111-wro-111\n"
+                "title: Wrocław\nplace_type: city\naliases:\n"
+                "  - Vratislav\nnote_key:   spaced\n---\nBody\n")
+        path = self.write(f"{FOLDERS['places']}/Wrocław.md", text)
+        plan = Plan(places={"wroclaw": PlannedPlace(
+            key="wroclaw", title="Wrocław", place_type="city",
+            aliases=["Vratislav", "BRESLAU"], status="created",
+            cr_id="wro-111-wro-111",
+            file=f"{FOLDERS['places']}/Wrocław.md")})
+        existing = list(vault.iter_notes(self.cfg.places))
+        self.assertEqual(placeplan.check(plan, self.cfg, existing), [])
+        res = self._apply(plan)
+        self.assertEqual(res.created, [])
+        self.assertEqual(res.aliased, [f"{FOLDERS['places']}/Wrocław.md"])
+        with open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), text.replace(
+                "  - Vratislav\n", "  - Vratislav\n  - BRESLAU\n"))
+        again = self._apply(plan)
+        self.assertEqual((again.created, again.aliased), ([], []))
+        with open(path, encoding="utf-8") as fh:
+            self.assertIn("BRESLAU", fh.read())
+
+    def test_an_approved_entry_is_not_a_duplicate_of_its_own_note(self):
+        text = ("---\ncr_type: place\ncr_id: wro-111-wro-111\n"
+                "title: Wrocław\nplace_type: city\n---\n")
+        self.write(f"{FOLDERS['places']}/Wrocław.md", text)
+        plan = Plan(places={"wroclaw": PlannedPlace(
+            key="wroclaw", title="Wrocław", place_type="city",
+            aliases=["Breslau"], status="approved", cr_id="wro-111-wro-111")})
+        existing = list(vault.iter_notes(self.cfg.places))
+        self.assertEqual(placeplan.check(plan, self.cfg, existing), [])
+
     def test_a_second_apply_writes_nothing(self):
         self._apply(_chain())
         before = {n: self.read(f"{FOLDERS['places']}/{n}")

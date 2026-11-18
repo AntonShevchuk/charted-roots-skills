@@ -28,7 +28,7 @@ Exit codes: 0 ok; 1 problems found or the write refused; 2 the run could not sta
 ## Steps
 
 1. **Check the vault** — `data.json` is present and `placesFolder` names the gazetteer. Run `vault_verify.py` as the baseline; `apply --apply` compares the suite before and after and calls only the difference a regression.
-2. **Extract** — `places_plan.py extract`. It lists each distinct PLAC string with its count and records a string the plugin's own lookups already resolve as `approved` against that note. Re-running on a new export adds only new strings and never drops a reviewed entry. Report the totals.
+2. **Extract** — `places_plan.py extract`. It lists each distinct PLAC string with its count and records a string the plugin's own lookups already resolve as `approved` against that note. Re-running on a new export adds only new strings and never drops a reviewed entry. A string that is not a place gets `not_place` filled in at `proposed`; leave those entries alone unless the user disagrees. Commit the plan file now: `apply --apply` checks only the entity folders for a clean tree (`History/` is not among them), but a committed plan keeps the review diffable. Report the totals.
 3. **Propose one batch at a time**, largest country first, from your knowledge and the PLAC strings themselves. No web search unless the user asks. Show each batch in this format:
 
    ```
@@ -55,9 +55,9 @@ Exit codes: 0 ok; 1 problems found or the write refused; 2 the run could not sta
 
 Run `extract` again: it adds only the strings not yet in the plan. A new string is never linked through an alias until the user has approved it, so propose just those, as above. Also look for:
 
-- **Missing aliases**: a Place the export names in a form it lacks. Add a plan entry for the existing note (its `cr_id`) with the missing alias, approved on the user's word; `apply` adds aliases to an existing Place and changes nothing else on it.
+- **Missing aliases**: a Place the export names in a form it lacks. `extract` records every existing Place it resolves as a `created` entry with its `cr_id`. Add the missing form to that entry's `aliases` in the plan; on the user's approval run `check`, then `apply --apply`. It adds the aliases the note lacks (case-insensitive, existing order kept) and changes nothing else on it; a second run writes nothing.
 - **Likely duplicates**: propose a merge to the user under the core model's merge rule, one merge at a time with their approval. `apply` never merges.
-- **An existing Place on a historical chain** (a `Preußen` country note): the plan does not parent new Places under it and does not create a modern twin. Propose a re-parent, retitle or merge to the user instead.
+- **An existing Place on a historical chain** (a `Preußen` country note): do not parent new Places under it and do not create a modern twin. Propose a re-parent, retitle or merge to the user instead. The scripts do not guard this; it is on you.
 
 ## What the script will not do
 

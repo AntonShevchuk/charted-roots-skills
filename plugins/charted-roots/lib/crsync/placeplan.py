@@ -406,6 +406,9 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
             hit = current.by_title_parent.get(
                 f"{places.key(p.title)}|{places.key(basenames[parent.key])}")
             how = "title and parent"
+        if (hit is not None and p.cr_id
+                and hit.scalar("cr_id") == p.cr_id):
+            hit = None      # the note this entry itself names
         if hit is not None:
             problems.append(
                 f"{key}: already exists as '{hit.basename}' (same {how})")
@@ -451,7 +454,7 @@ def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
     """Write the approved places, parents before children.
 
     A place whose `cr_id` names a note already in the places folder only gains
-    the aliases it lacks; any other approved place becomes a new note. A real
+    the aliases it lacks, as does a `created` place whose note exists; any other approved place becomes a new note. A real
     run then records `status`, `cr_id` and `file` on each place it handled and
     saves the plan. Names come from `assign_basenames`, the same call `check`
     makes, so the files written are the ones `check` validated.
@@ -504,6 +507,20 @@ def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
                 vault.write_atomic(
                     path, render_note(p, plan, basenames, cr_ids))
             handled[p.key] = rel(path)
+
+    # A created place whose note exists may have gained aliases in the plan.
+    for p in plan.places.values():
+        if p.status != "created":
+            continue
+        note = _existing_note(p, existing, cfg)
+        if note is None:
+            continue
+        merged = _merged_aliases(note.as_list("aliases"), p.aliases)
+        if merged != note.as_list("aliases"):
+            res.aliased.append(rel(note.path))
+            if not dry:
+                note.set("aliases", merged)
+                note.save()
 
     if not dry and handled:
         for key, path in handled.items():
