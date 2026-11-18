@@ -17,6 +17,8 @@ spelling difference between them is never reported as a conflict.
 
 from __future__ import annotations
 
+import calendar
+import datetime
 import re
 
 #: English, plus the German forms upstream trees carry from transcribed
@@ -152,6 +154,116 @@ def person_form(value: str) -> str:
     if qual == "ABT":
         return f"c. {start}"
     return start
+
+
+# -- classify / bounds: how a validator reads a raw GEDCOM date -------------
+
+_EN_MONTHS = tuple(MONTHS)[:12]
+_G_DATE = r'(?:(?:\d{1,2}\s+)?(?:' + "|".join(_EN_MONTHS) + r')\s+)?\d{3,4}'
+#: GEDCOM 5.5.1 grammar, English months only (case is ignored).
+_G_STRICT = re.compile(
+    r'^(?:%(d)s|(?:ABT|CAL|EST|BEF|AFT)\s+%(d)s|BET\s+%(d)s\s+AND\s+%(d)s'
+    r'|FROM\s+%(d)s\s+TO\s+%(d)s)$' % {"d": _G_DATE}, re.I)
+#: Valid GEDCOM that `from_gedcom` returns as `unknown`.
+_G_UNPARSED = re.compile(
+    r'^(?:\(.*\)|INT\s+.+\(.*\)|@#D.*|(?:FROM|TO)\s+%s)$' % _G_DATE, re.I)
+_G_BC = re.compile(r'B\.C\.?$', re.I)
+_G_DUAL = re.compile(r'(?<!\d)\d{3,4}/\d{2}(?!\d)')
+_CAL_EST = re.compile(r'^(CAL|EST)(?![A-Z])')
+
+
+def _read(d: str) -> tuple | None:
+    """Mirror `from_gedcom`: (qualifier, range kind, [single results]) or None."""
+    up = d.upper()
+    for kind, m in (("BET", re.match(r'^BET\.?\s+(.+?)\s+AND\s+(.+)$', up)),
+                    ("FROM", re.match(r'^FROM\s+(.+?)\s+TO\s+(.+)$', up)),
+                    ("SPAN", _YEAR_SPAN.match(d))):
+        if m:
+            parts = [single(m.group(1)), single(m.group(2))]
+            return ("", kind, parts) if all(parts) else None
+    qual, rest = _strip_prefix(d)
+    one = single(rest)
+    if one is None:
+        return None
+    cal = _CAL_EST.match(up)
+    return (cal.group(1) if cal else qual), "", [one]
+
+
+def _on_calendar(iso: str) -> bool:
+    bits = [int(b) for b in iso.split("-")]
+    try:
+        datetime.date(bits[0], *(bits[1:] + [1, 1][len(bits) - 1:]))
+    except ValueError:
+        return False
+    return True
+
+
+def _spell(one: tuple) -> str:
+    iso, precision = one
+    y, *rest = iso.split("-")
+    if precision == "year":
+        return y
+    mon = _EN_MONTHS[int(rest[0]) - 1]
+    return "%d %s %s" % (int(rest[1]), mon, y) if precision == "exact" else f"{mon} {y}"
+
+
+def classify(raw: str) -> tuple:
+    """Raw GEDCOM date -> (label, suggestion).
+
+    Labels: `empty`, `standard` (5.5.1 grammar and `from_gedcom` reads it),
+    `standard-unparsed` (valid grammar `from_gedcom` cannot read), `invalid`
+    (reads, but not a calendar day), `lenient` (reads, but is not 5.5.1;
+    the suggestion is the 5.5.1 spelling) and `unreadable`.
+    """
+    d = (raw or "").strip()
+    if not d:
+        return "empty", ""
+    if (_G_UNPARSED.match(d) or _G_BC.search(d) or _G_DUAL.search(d)):
+        return "standard-unparsed", ""
+    read = _read(d)
+    if read is None:
+        return "unreadable", ""
+    qual, kind, parts = read
+    if not all(_on_calendar(p[0]) for p in parts):
+        return "invalid", ""
+    if _G_STRICT.match(d):
+        return "standard", ""
+    spelled = [_spell(p) for p in parts]
+    if kind:
+        return "lenient", ("BET %s AND %s" if kind == "SPAN" or kind == "BET"
+                           else "FROM %s TO %s") % tuple(spelled)
+    return "lenient", f"{qual} {spelled[0]}".strip()
+
+
+def _extent(one: tuple) -> tuple:
+    iso, precision = one
+    if precision == "exact":
+        return iso, iso
+    y, m = int(iso[:4]), (int(iso[5:7]) if precision == "month" else None)
+    if m is None:
+        return "%04d-01-01" % y, "%04d-12-31" % y
+    return "%04d-%02d-01" % (y, m), "%04d-%02d-%02d" % (y, m, calendar.monthrange(y, m)[1])
+
+
+def bounds(raw: str) -> tuple:
+    """Earliest and latest ISO day a date can mean, or (None, None).
+
+    Generous on purpose: `ABT` is +/-10 years, `BEF` / `AFT` are open-ended.
+    Dates that do not classify as standard or lenient have no bounds.
+    """
+    if classify(raw)[0] not in ("standard", "lenient"):
+        return None, None
+    qual, kind, parts = _read(raw.strip())
+    ext = [_extent(p) for p in parts]
+    lo, hi = min(e[0] for e in ext), max(e[1] for e in ext)
+    if qual == "BEF":
+        return None, hi
+    if qual == "AFT":
+        return lo, None
+    if qual in ("ABT", "CAL", "EST"):
+        return ("%04d-01-01" % max(int(lo[:4]) - 10, 1),
+                "%04d-12-31" % min(int(hi[:4]) + 10, 9999))
+    return lo, hi
 
 
 # -- the plugin's "Validate date formats" command ---------------------------

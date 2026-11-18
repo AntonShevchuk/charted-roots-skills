@@ -98,5 +98,74 @@ class PluginValidator(unittest.TestCase):
             "1804", {**SETTINGS, "allowPartialDates": False}), "")
 
 
+class Classify(unittest.TestCase):
+
+    def test_labels(self):
+        cases = {
+            "": ("empty", ""),
+            "25 DEC 1914": ("standard", ""),
+            "25 Dec 1914": ("standard", ""),          # case alone is fine
+            "Abt 1804": ("standard", ""),
+            "BET 1850 AND 1858": ("standard", ""),
+            "FROM 1850": ("standard-unparsed", ""),
+            "INT 1850 (from age)": ("standard-unparsed", ""),
+            "(about the war)": ("standard-unparsed", ""),
+            "@#DJULIAN@ 1 JAN 1700": ("standard-unparsed", ""),
+            "1750/51": ("standard-unparsed", ""),
+            "31 FEB 1850": ("invalid", ""),
+            "25 Dez 1914": ("lenient", "25 DEC 1914"),
+            "1.6.1824": ("lenient", "1 JUN 1824"),
+            "1914-12-25": ("lenient", "25 DEC 1914"),
+            "c. 1804": ("lenient", "ABT 1804"),
+            "Abt. 1804": ("lenient", "ABT 1804"),
+            "December 1914": ("lenient", "DEC 1914"),
+            "BET. 1 Jan 1850 AND 1858": ("lenient", "BET 1 JAN 1850 AND 1858"),
+            "1850-1858": ("lenient", "BET 1850 AND 1858"),
+            "25 Foo 1914": ("unreadable", ""),
+            "BET 1850 AND sometime": ("unreadable", ""),
+        }
+        for raw, want in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(dates.classify(raw), want)
+
+    def test_more_forms(self):
+        cases = {
+            "FROM 1850 TO 1858": ("standard", ""),
+            "TO 1858": ("standard-unparsed", ""),
+            "1850 B.C.": ("standard-unparsed", ""),
+            "About 1804": ("lenient", "ABT 1804"),
+            "Before 1900": ("lenient", "BEF 1900"),
+            "After 1900": ("lenient", "AFT 1900"),
+            "Circa 1804": ("lenient", "ABT 1804"),
+            "CAL. 1804": ("lenient", "CAL 1804"),
+            "EST. 1804": ("lenient", "EST 1804"),
+            "Dec. 1914": ("lenient", "DEC 1914"),
+            "BET 31 FEB 1850 AND 1858": ("invalid", ""),
+            "BET 1850 AND 31 FEB 1858": ("invalid", ""),
+            "1850-13-05": ("invalid", ""),
+            "hello": ("unreadable", ""),
+        }
+        for raw, want in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(dates.classify(raw), want)
+
+
+class Bounds(unittest.TestCase):
+
+    def test_bounds(self):
+        self.assertEqual(dates.bounds("1850"), ("1850-01-01", "1850-12-31"))
+        self.assertEqual(dates.bounds("FEB 1852"), ("1852-02-01", "1852-02-29"))
+        self.assertEqual(dates.bounds("ABT 1850"), ("1840-01-01", "1860-12-31"))
+        self.assertEqual(dates.bounds("BEF 1900"), (None, "1900-12-31"))
+        self.assertEqual(dates.bounds("AFT 3 MAR 1900"), ("1900-03-03", None))
+        self.assertEqual(dates.bounds("BET 1850 AND 1858"), ("1850-01-01", "1858-12-31"))
+        self.assertEqual(dates.bounds("nonsense"), (None, None))
+
+    def test_no_bounds_when_it_does_not_read(self):
+        for raw in ("", "31 FEB 1850", "FROM 1850", "1750/51"):
+            with self.subTest(raw=raw):
+                self.assertEqual(dates.bounds(raw), (None, None))
+
+
 if __name__ == "__main__":
     unittest.main()
