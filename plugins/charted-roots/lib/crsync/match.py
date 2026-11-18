@@ -359,6 +359,30 @@ def _place_changes(note: vault.Note, ind: gedcom.Individual, place_index) -> lis
     return changes
 
 
+#: Person place fields filled from the export, and the event each summarises.
+#: Wider than PERSON_PLACES, which only covers fields held for a ruling.
+PERSON_FILL_PLACES = {"birth_place": "birth", "death_place": "death",
+                      "burial_place": "burial"}
+
+
+def _place_fills(note: vault.Note, ind: gedcom.Individual, place_index) -> list:
+    """`fill` changes for empty Person place fields whose PLAC resolves."""
+    if place_index is None:
+        return []
+    changes = []
+    for field_name, event_type in PERSON_FILL_PLACES.items():
+        if note.scalar(field_name):
+            continue
+        ev = next((e for e in ind.events if e.event_type == event_type), None)
+        if ev is None or not ev.place:
+            continue
+        resolved = place_index.find(ev.place)
+        if resolved is not None:
+            changes.append(Change(field_name, None, f"[[{resolved.basename}]]",
+                                  kind=FILL))
+    return changes
+
+
 def match_people(tree: gedcom.Tree, people: list, root: str,
                  adopt: bool = False, place_index=None) -> Plan:
     plan = Plan()
@@ -388,6 +412,7 @@ def match_people(tree: gedcom.Tree, people: list, root: str,
                            Change("external_id_source", None, "gedcom")]
                 changes += _compare(cand, person_projection(ind), PERSON_OWNED)
                 changes += _place_changes(cand, ind, place_index)
+                changes += _place_fills(cand, ind, place_index)
                 plan.add(Action("adopt", "person", xref, label=cand.basename,
                                 path=os.path.relpath(cand.path, root), changes=changes,
                                 note="; ".join(why)))
@@ -405,6 +430,7 @@ def match_people(tree: gedcom.Tree, people: list, root: str,
         note = notes[0]
         changes = _compare(note, person_projection(ind), PERSON_OWNED)
         changes += _place_changes(note, ind, place_index)
+        changes += _place_fills(note, ind, place_index)
         merged = alias_backfill(note, ind)
         if merged is not None:
             changes.append(Change("aliases", note.as_list("aliases"), merged, kind=FILL))

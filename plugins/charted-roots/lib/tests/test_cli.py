@@ -397,6 +397,65 @@ class PlanLeftovers(CliCase):
         self.assertIn("1 Citations NOT created", out)
 
 
+class HistoricalPlaces(CliCase):
+    """A historical PLAC links through aliases only when the plan approves it."""
+
+    PLAC = "Breslau, Schlesien, Preußen, Deutschland"
+    GED_ALIAS = GED.replace("2 DATE 1826\n2 PLAC Musterdorf",
+                            f"2 DATE 1826\n2 PLAC {PLAC}")
+
+    def setUp(self):
+        super().setUp()
+        self.write("FamilyTree.ged", self.GED_ALIAS)
+        self.write(f"{FOLDERS['places']}/Wrocław.md", frontmatter(
+            cr_type="place", cr_id="ppp-111-ppp-111", title="Wrocław",
+            full_name="Wrocław, Poland", place_type="city",
+            aliases=["Breslau"]))
+        self.commit("places")
+
+    def plan(self, status="approved", raw=None):
+        if raw is not None:
+            self.write("History/places-plan.json", raw)
+            return
+        self.write("History/places-plan.json", json.dumps({
+            "version": 1,
+            "places": {"wroclaw": {"title": "Wrocław", "place_type": "city",
+                                   "status": "approved"}},
+            "plac": {self.PLAC: {"count": 1, "place": "wroclaw",
+                                 "status": status}}},
+            ensure_ascii=False))
+
+    def test_sync_links_an_approved_historical_place(self):
+        self.plan("approved")
+        code, out, err = self.run_cli("--create")
+        self.assertEqual(code, 0, err)
+        self.assertIn('birth_place: "[[Wrocław]]"', out)
+
+    def test_sync_ignores_an_unapproved_alias_match(self):
+        self.plan("proposed")
+        code, out, err = self.run_cli("--create")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("[[Wrocław]]", out)
+        self.assertRegex(out, r"place values left off a new note\s+[1-9]")
+        self.assertIn("review with /charted-roots:organize-places", out)
+
+    def test_a_broken_plan_file_does_not_stop_the_sync(self):
+        self.plan(raw="{not json")
+        code, out, err = self.run_cli("--create")
+        self.assertEqual(code, 0, err)
+        self.assertIn("places-plan.json", out)
+        self.assertIn("alias matching is off", out)
+        self.assertNotIn("[[Wrocław]]", out)
+
+    def test_apply_logs_the_broken_plan_warning(self):
+        self.plan(raw="{not json")
+        self.commit("broken plan")
+        code, out, err = self.run_cli("--apply", "--allow-obsidian-open",
+                                      "--no-restore-point")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("alias matching is off", out)
+
+
 class Apply(CliCase):
 
     def apply(self, *argv):

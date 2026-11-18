@@ -67,6 +67,13 @@ so adding the export's form to `aliases:` resolves a naming variant. A
 disagreeing pair keyed positionally is usually paired wrong. No ruling can
 write a place that does not resolve to a Place note.
 
+A historical PLAC (`Breslau, Schlesien, ...`) links through Place aliases only
+when `History/places-plan.json` approves that exact string (see
+`/charted-roots:organize-places`); an unreadable plan turns alias matching off
+for the run and prints a warning. An empty Person `birth_place:` /
+`death_place:` / `burial_place:` is filled with a `[[Place]]` link once the
+PLAC resolves.
+
 Dates are written in two forms (`crsync/dates.py`). A Person's `born` /
 `died` must pass the plugin's *Validate date formats* command, so `ABT` is
 written `c. 1804`, a range `1850 to 1858`, and `BEF` / `AFT` is dropped to the

@@ -78,7 +78,8 @@ def _histogram(counter, indent="      ") -> list:
 
 def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
            citation_match, place_index, obsidian_running, limit=10,
-           decisions=None, creation=None, only=None, blocked=None) -> str:
+           decisions=None, creation=None, only=None, blocked=None,
+           warning="") -> str:
     L: list = []
     a = L.append
 
@@ -94,6 +95,8 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
     a(f"         {tree.header.get('source','?')} {tree.header.get('version','?')}, "
       f"exported {tree.header.get('date','?')}")
     a(f"  vault  {cfg.root}")
+    if warning:
+        a(f"  WARNING  {warning}")
     if obsidian_running is None:
         obsidian = "cannot tell -- apply would refuse"
     elif obsidian_running:
@@ -306,7 +309,8 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
         row("Sources with no source_type", len(unassigned),
             "set by hand; `document` is never valid")
         row("place values left off a new note", len(plan.unresolved_places),
-            "unresolvable against the gazetteer")
+            "unresolvable against the gazetteer; "
+            "review with /charted-roots:organize-places")
         row("legacy `spouse:` notes, several spouses", len(creation.migrations))
         a("")
         a("  follow-up passes in the same run")

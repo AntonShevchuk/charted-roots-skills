@@ -10,9 +10,10 @@ from __future__ import annotations
 import os
 import unittest
 
-from crsync import gedcom, match, vault
+from crsync import apply as apply_mod
+from crsync import gedcom, match, places, vault
 
-from .helpers import VaultCase, ged
+from .helpers import FOLDERS, VaultCase, frontmatter, ged
 
 TWO_PEOPLE = """0 @I1@ INDI
 1 NAME Jürgen /Muster/
@@ -231,6 +232,71 @@ class Variant(VaultCase):
                       "_alt_names": ["Anna Muster, of Musterdorf"]}
         changes = match._compare(note, projection, ["name"])
         self.assertEqual([c.kind for c in changes], [match.VARIANT])
+
+
+class PlaceFill(VaultCase):
+    """An empty Person place field is filled once the PLAC resolves."""
+
+    GED = """0 HEAD
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Vera /Test/
+1 BIRT
+2 PLAC Musterdorf
+1 DEAT
+2 PLAC Musterdorf
+1 BURI
+2 PLAC Musterdorf
+0 TRLR
+"""
+
+    def setUp(self):
+        super().setUp()
+        self.write(f"{FOLDERS['places']}/Musterdorf.md", frontmatter(
+            cr_type="place", cr_id="ppp-000-ppp-000", title="Musterdorf",
+            full_name="Musterdorf", place_type="locality"))
+
+    def note(self, **keys):
+        path = self.person("Vera Test", external_id="I1", **keys)
+        return vault.parse(path)
+
+    def fills(self, note, text=None):
+        ind = gedcom.parse(ged(text or self.GED)).individuals["I1"]
+        return match._place_fills(note, ind, places.load(self.cfg.places))
+
+    def test_an_empty_birth_place_is_filled_with_a_link(self):
+        changes = self.fills(self.note())
+        birth = [c for c in changes if c.field == "birth_place"]
+        self.assertEqual([(c.old, c.new, c.kind) for c in birth],
+                         [(None, "[[Musterdorf]]", match.FILL)])
+
+    def test_burial_place_is_filled_too(self):
+        self.assertIn("burial_place", [c.field for c in self.fills(self.note())])
+
+    def test_a_held_place_is_not_filled(self):
+        note = self.note(birth_place='"[[Elsewhere]]"')
+        self.assertNotIn("birth_place", [c.field for c in self.fills(note)])
+
+    def test_an_unresolved_plac_fills_nothing(self):
+        text = self.GED.replace("Musterdorf", "Nowhereville")
+        self.assertEqual(self.fills(self.note(), text), [])
+
+    def test_the_person_places_stay_birth_and_death_only(self):
+        self.assertEqual(set(match.PERSON_PLACES), {"birth_place", "death_place"})
+
+    def test_the_field_pass_writes_a_quoted_link(self):
+        self.note()
+        people = list(vault.iter_notes(self.cfg.people))
+        tree = gedcom.parse(ged(self.GED))
+        plan = match.match_people(tree, people, self.root,
+                                  place_index=places.load(self.cfg.places))
+        by_path = {n.path: n for n in people}
+        written, _, _ = apply_mod.apply_field_updates(
+            plan, "person", by_path, self.root, dry=False)
+        self.assertTrue(written)
+        text = self.read(f"{FOLDERS['people']}/Vera Test.md")
+        self.assertIn('burial_place: "[[Musterdorf]]"', text)
+        self.assertIn('birth_place: "[[Musterdorf]]"', text)
 
 
 if __name__ == "__main__":

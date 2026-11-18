@@ -29,7 +29,7 @@ from dataclasses import dataclass
 import vault_verify
 from crsync import apply as apply_mod
 from crsync import (
-    citations, config, create, decisions, events, gedcom, match, places,
+    citations, config, create, decisions, events, gedcom, match, placeplan, places,
     report, vault, verify,
 )
 
@@ -104,6 +104,8 @@ class Reconciliation:
     source_plan: match.Plan | None
     event_match: events.EventMatch | None
     citation_match: citations.CitationMatch | None
+    #: Set when the places plan could not be read; the sync ran without it.
+    plan_warning: str = ""
 
     def allnotes(self) -> list:
         return (self.people + self.sources + self.event_notes
@@ -161,11 +163,19 @@ def _reconcile(cfg: config.Config, opts: Options) -> Reconciliation:
     sources = list(vault.iter_notes(cfg.sources))
     event_notes = list(vault.iter_notes(cfg.events))
     citation_notes = list(vault.iter_notes(cfg.citations))
-    place_index = places.load(cfg.places)
+    plan_warning = ""
+    try:
+        approved = placeplan.approved_placs(placeplan.load(cfg.root))
+    except placeplan.PlanError as exc:
+        approved = set()
+        plan_warning = (f"{exc}; alias matching is off for this run "
+                        f"(no historical place is linked)")
+    place_index = places.load(cfg.places, approved=approved)
     return Reconciliation(
         ged_path=opts.ged_path, tree=tree, people=people, sources=sources,
         event_notes=event_notes, citation_notes=citation_notes,
         place_index=place_index, decisions=decisions.load(cfg.root),
+        plan_warning=plan_warning,
         person_plan=(match.match_people(tree, people, cfg.root,
                                         adopt=opts.adopt_by_name,
                                         place_index=place_index)
@@ -268,6 +278,8 @@ def cmd_apply(cfg: config.Config, opts: Options) -> int:
 
     r = _reconcile(cfg, opts)
     log.scope(scope)
+    if r.plan_warning:
+        log.out(f"WARNING: {r.plan_warning}")
     log.rulings(r.decisions)
     if opts.adopt_by_name and r.person_plan is not None:
         log.adoptions(r.person_plan.of("person", "adopt"))
@@ -346,7 +358,8 @@ def cmd_report(cfg: config.Config, opts: Options) -> int:
                          r.source_plan, r.event_match, r.citation_match,
                          r.place_index, apply_mod.obsidian_running(),
                          limit=opts.limit, decisions=r.decisions,
-                         creation=creation, only=opts.scope, blocked=blocked)
+                         creation=creation, only=opts.scope, blocked=blocked,
+                         warning=r.plan_warning)
     print(text)
     if opts.out:
         with open(opts.out, "w", encoding="utf-8") as fh:
