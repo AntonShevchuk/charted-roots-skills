@@ -6,6 +6,7 @@ here reads or writes the vault, and nothing writes the `.ged`.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import dates as gedcom_dates
@@ -291,9 +292,112 @@ def _dates(tree, host):
     yield from _date_order(tree, host)
 
 
+def _clean_place(raw: str) -> str:
+    parts = (" ".join(p.split()) for p in raw.split(","))
+    return ", ".join(p for p in parts if p)
+
+
+def _who(owners) -> str:
+    names = list(dict.fromkeys(owners))
+    out = ", ".join(names[:3])
+    return out + (f" and {len(names) - 3} more" if len(names) > 3 else "")
+
+
+def _subsequence(small, big) -> bool:
+    it = iter(big)
+    return all(x in it for x in small)
+
+
+def _uses(n: int) -> str:
+    return f"{n} use{'s' if n != 1 else ''}"
+
+
+def _places(tree, host):
+    by_raw: dict = {}      # PLAC as written -> [(who, event)]
+    for who, ev in _all_events(tree):
+        if ev.folded or not ev.place_raw.strip():
+            continue
+        by_raw.setdefault(ev.place_raw, []).append((who, ev))
+
+    def line(uses):
+        return min(ev.line for _, ev in uses)
+
+    by_clean: dict = {}    # cleaned string -> [(who, event)]
+    for raw, uses in by_raw.items():
+        shown = f"\"{raw}\" ({_uses(len(uses))})"
+        who = _who(w for w, _ in uses)
+        reason = gedcom.non_place_reason(raw)
+        if reason:
+            yield Finding(
+                "place-non-place", "places", "fix", who, line(uses),
+                f"PLAC {shown} is not a place (\"{reason}\")",
+                f"in {host}: move the unit / rank into the description; "
+                f"set PLAC to the place")
+        cleaned = _clean_place(raw)
+        if not cleaned:
+            continue
+        if raw != cleaned and re.sub(r",(?=\S)", ", ", raw) != cleaned:
+            yield Finding(
+                "place-format", "places", "fix", who, line(uses),
+                f"PLAC {shown} has stray spaces or commas",
+                f"in {host}: write \"{raw}\" as \"{cleaned}\"")
+        by_clean.setdefault(cleaned, []).extend(uses)
+
+    groups: dict = {}      # fold -> [cleaned strings]
+    for cleaned in by_clean:
+        groups.setdefault(places.fold(cleaned), []).append(cleaned)
+
+    def ranked(strings):
+        return sorted(strings, key=lambda c: (-len(by_clean[c]), c))
+
+    reps = {}
+    for fkey, strings in groups.items():
+        order = ranked(strings)
+        reps[fkey] = order[0]
+        if len(strings) < 2:
+            continue
+        uses = [u for c in strings for u in by_clean[c]]
+        spell = ", ".join(f"\"{c}\" ({len(by_clean[c])})" for c in order)
+        yield Finding(
+            "place-variant", "places", "fix", _who(w for w, _ in uses),
+            line(uses), f"one place written {len(strings)} ways: {spell}",
+            f"in {host}: use one spelling; most used: \"{order[0]}\" "
+            f"({len(by_clean[order[0]])})")
+
+    parts = {f: tuple(places.fold(x) for x in rep.split(", "))
+             for f, rep in reps.items()}
+    for fkey, rep in sorted(reps.items()):
+        leaf, chain = parts[fkey][0], parts[fkey][1:]
+        fuller = sorted(
+            reps[g] for g in reps
+            if g != fkey and parts[g][0] == leaf
+            and len(parts[g]) > len(parts[fkey])
+            and _subsequence(chain, parts[g][1:]))
+        if not fuller:
+            continue
+        uses = [u for c in groups[fkey] for u in by_clean[c]]
+        who, ln = _who(w for w, _ in uses), line(uses)
+        quoted = ", ".join(f"\"{f}\"" for f in fuller)
+        if chain:
+            yield Finding(
+                "place-hierarchy", "places", "review", who, ln,
+                f"\"{rep}\" is a shorter form of another place",
+                f"in {host}: standardise to the fuller form: {quoted}")
+        elif len(fuller) == 1:
+            yield Finding(
+                "place-hierarchy", "places", "fix", who, ln,
+                f"\"{rep}\" has no parents; \"{fuller[0]}\" has the same leaf",
+                f"in {host}: use \"{fuller[0]}\"")
+        else:
+            yield Finding(
+                "place-hierarchy", "places", "review", who, ln,
+                f"\"{rep}\" has no parents; several places share the leaf",
+                f"in {host}: decide which one is meant: {quoted}?")
+
+
 #: Adding a check group is one entry here.
 _RUNNERS = {"duplicates": _duplicates, "marriages": _marriages,
-            "dates": _dates}
+            "dates": _dates, "places": _places}
 
 
 def run(tree, only: set | None = None) -> list:

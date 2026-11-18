@@ -210,6 +210,84 @@ class Dates(unittest.TestCase):
         self.assertEqual(check(life("ABT 1850", "1845")), [])
 
 
+def PLAC(*places):
+    return indi(*[x for p in places for x in ("1 RESI", "2 DATE 1 JUN 1830",
+                                              f"2 PLAC {p}")])
+
+
+PLACS = PLAC
+
+
+class Places(unittest.TestCase):
+    def test_non_place(self):
+        f = only(check(PLAC("Infanterie-Regiment 51")), "place-non-place")
+        self.assertEqual(f.kind, "fix")
+        self.assertIn("Infanterie-Regiment 51", f.what)
+        self.assertTrue(f.fix.startswith("in Ancestry: "))
+
+    def test_format(self):
+        f = only(check(PLAC("Berlin ,  Preußen,")), "place-format")
+        self.assertIn('"Berlin, Preußen"', f.fix)
+
+    def test_no_space_after_comma_alone_is_fine(self):
+        self.assertEqual(check(PLAC("Berlin,Preußen")), [])
+
+    def test_variant_case_and_accents(self):
+        f = only(check(PLACS("Wrocław, Polska", "Wroclaw, Polska",
+                             "wrocław, polska", "Wrocław, Polska")),
+                 "place-variant")
+        self.assertIn('"Wrocław, Polska" (2)', f.fix)
+
+    def test_variant_tie_is_alphabetical(self):
+        f = only(check(PLACS("b place", "A place")), "place-variant")
+        self.assertIn('"A place"', f.fix)
+
+    def test_hierarchy_fuller_form(self):
+        f = only(check(PLACS("Berlin, Germany", "Berlin, Brandenburg, Germany")),
+                 "place-hierarchy")
+        self.assertEqual(f.kind, "review")
+        self.assertIn('"Berlin, Brandenburg, Germany"', f.fix)
+
+    def test_variants_do_not_double_report_hierarchy(self):
+        findings = check(PLACS("Berlin, Germany", "berlin, germany",
+                               "Berlin, Brandenburg, Germany"))
+        only(findings, "place-hierarchy")
+
+    def test_bare_leaf_one_fuller_is_a_fix(self):
+        f = only(check(PLACS("Berlin", "Berlin, Germany")), "place-hierarchy")
+        self.assertEqual(f.kind, "fix")
+        self.assertIn('use "Berlin, Germany"', f.fix)
+
+    def test_bare_leaf_two_fuller_is_a_review(self):
+        f = only(check(PLACS("Springfield", "Springfield, Illinois",
+                             "Springfield, Ohio")), "place-hierarchy")
+        self.assertEqual(f.kind, "review")
+        self.assertIn("Illinois", f.fix)
+        self.assertIn("Ohio", f.fix)
+
+    def test_unrelated_parents_are_fine(self):
+        self.assertEqual(
+            check(PLACS("Springfield, Illinois", "Springfield, Ohio")), [])
+
+    def test_folded_marriage_place_counted_once(self):
+        text = (
+            "0 @I1@ INDI\n1 NAME Karl /Beispiel/\n1 FAMS @F1@\n"
+            "1 MARR\n2 DATE 1 JUN 1850\n2 PLAC Musterdorf ,\n"
+            "0 @I2@ INDI\n1 NAME Anna /Muster/\n1 FAMS @F1@\n"
+            "0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n1 MARR\n"
+            "2 DATE 1 JUN 1850\n2 PLAC Musterdorf ,\n0 TRLR\n")
+        f = only(check(text), "place-format")
+        self.assertIn("(1 use)", f.what)
+
+    def test_who_lists_three_then_and_more(self):
+        text = "".join(
+            f"0 @I{i}@ INDI\n1 NAME P{i} /Muster/\n1 RESI\n2 DATE 1 JUN 1830\n"
+            f"2 PLAC Infanterie-Regiment 51\n" for i in range(1, 6)) + "0 TRLR\n"
+        f = only(check(text), "place-non-place")
+        self.assertTrue(f.who.endswith(" and 2 more"), f.who)
+        self.assertIn("(5 uses)", f.what)
+
+
 class Run(unittest.TestCase):
     def test_only_filters_by_group(self):
         text = TWO_SAME_BIRTHS
