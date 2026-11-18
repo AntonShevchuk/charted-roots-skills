@@ -108,6 +108,43 @@ Add it to a dry run first: section 7 previews every planned note — paths, the
 first of each kind in full, the follow-up relationship and citation passes,
 and everything the planner left for a human.
 
+## gedcom_check
+
+`gedcom_check.py` lists what to fix in a GEDCOM export before it is imported. It
+needs no vault and never edits the `.ged`: it reads the file and prints findings.
+Each names the person, the line in the file and a one-line fix to make in the
+tree's host (`in Ancestry: ...`, from the HEAD `SOUR`).
+
+    python3 <lib>/gedcom_check.py                       # FamilyTree.ged in the current directory
+    python3 <lib>/gedcom_check.py --ged FILE            # another file
+    python3 <lib>/gedcom_check.py --only dates,places   # some groups only
+    python3 <lib>/gedcom_check.py --json                # all findings as JSON
+    python3 <lib>/gedcom_check.py --out report.txt      # also write the report to a file
+
+`--only` takes a comma-separated list of groups (`duplicates`, `marriages`,
+`dates`, `places`). `--limit N` shows N findings per check in the text report
+(default 20; 0 shows all); `--json` ignores it. Lines the parser skips appear as
+`WARNING` lines in the report header.
+
+| Check | Group | Kind | Rule |
+|---|---|---|---|
+| `dup-vital` | duplicates | fix / review | A person has two or more BIRT, DEAT, BURI or CREM; identical is a fix, differing a review |
+| `dup-event-exact` | duplicates | fix | A repeatable fact (RESI, CENS, EVEN ...) recorded twice with the same date and place |
+| `dup-marriage` | duplicates | fix / review | One family has two MARR; identical is a fix, differing a review |
+| `dup-family` | duplicates | review | Two families for the same couple |
+| `marriage-on-person` | marriages | fix / review | A marriage recorded on a person (MARR, or EVEN of type MARR) instead of the family |
+| `date-unreadable` | dates | fix | A date that cannot be read |
+| `date-invalid` | dates | fix | A date that is not a real calendar day |
+| `date-nonstandard` | dates | fix | A date the importer reads but GEDCOM does not allow; the finding gives the standard form |
+| `date-order` | dates | review | Dates that cannot be right: death before birth, burial before death, birth before a parent's, a lifespan over 120 years |
+| `place-non-place` | places | fix | A PLAC that is a unit or rank, not a place |
+| `place-format` | places | fix | Stray spaces or commas in a PLAC |
+| `place-variant` | places | fix | One place written several ways (accents, case, spacing); names the most used |
+| `place-hierarchy` | places | fix / review | A place that is a shorter form of another with the same leaf; one candidate is a fix, several a review |
+
+Exit codes: 0 no findings; 1 findings; 2 the run could not start (bad flags,
+missing or unreadable GEDCOM).
+
 ## places_plan
 
 `places_plan.py` builds the Place notes behind historical PLAC strings; the
