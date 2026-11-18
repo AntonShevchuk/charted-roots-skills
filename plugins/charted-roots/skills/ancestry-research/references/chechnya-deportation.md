@@ -1,0 +1,95 @@
+# Chechnya: the 1944 deportation, special settlement, names and villages
+
+Read this file when a family is Chechen or lived in Checheno-Ingushetia before 1944, when the lineage passes through the 1944 deportation and special settlement in Kazakhstan or Kirghizia (Kyrgyzstan), or when the spelling of names and village names in documents differs from what the family uses. The practical techniques were proposed by the author of PR #45 from field research in October 2026. Examples are illustrative; no data from the private case are included here. The author's observations on access are dated and do not amount to an independent check of the whole resource or its permanent state. Much applies to Ingush families, but their routes were not separately tested.
+
+## 1. Jurisdiction on the event date
+
+1. The deportation of Chechens and Ingush began on 23 February 1944; in March 1944 the ЧИ АССР (Checheno-Ingush ASSR) was abolished. Most of its territory until 1957 formed the Grozny Oblast of the RSFSR; some raions were transferred to the Dagestan ASSR, the North Ossetian ASSR and the Georgian SSR. The ЧИ АССР was restored in January 1957. Mass return took place in 1957–1958; some families returned later.
+2. For events and documents of 1944–1957 relating to the territory of the former ЧИ АССР, record the jurisdiction as stated in the source (Grozny Oblast, Dagestan ASSR, etc.). For events in special settlement, give the Union republic (Kazakh or Kirghiz SSR), oblast, raion, selsoviet (village council) and, if known, the sovkhoz, kolkhoz or enterprise. In the vault the identified chain goes into Place notes per `CLAUDE.md` (a sovkhoz, kolkhoz or settlement is a `locality`); a place not yet identified stays unidentified in the Hypothesis or Survey — never invent a parent chain.
+3. The raion grid of the ЧИ АССР before 1944 and after 1957 does not coincide. To establish the raion of birth or conscription, use the administrative-territorial handbook for the event date, not a modern map.
+
+## 2. Renamed villages
+
+After the deportation many Chechen villages were renamed. According to secondary references, the former names were restored in different years, including 1957–1958 and 1989, sometimes via an intermediate name; check the specific renaming against the relevant act. Hence documents up to 1989 — including the "place of birth" field in passports and military documents — may carry the temporary name.
+
+| Historical name | Name from 1944 | Name restored (per ru.wikipedia articles) |
+|---|---|---|
+| Урус-Мартан | Красноармейское | 1957 |
+| Шали | Междуречье | 1957 |
+| Ачхой-Мартан | Новосельское | 1957 |
+| Курчалой | Чкалово | 1957 |
+| Старые Атаги | Предгорное | 1958 |
+| Шатой | Советское | 1989 |
+
+- Search under both names and keep the place as written in the transcription and Source; once the place is identified, the other name goes in the Place note's `aliases:`. The year of the reverse renaming in the table is a guide, not proof of when a record was made.
+- Places of exile were renamed too: in Kazakhstan and Kirghizia (Kyrgyzstan) after 1991 the names of many villages, raions and farms changed, and the raions of the 1950s were redrawn repeatedly. Official renaming decisions in Kazakhstan are published in the legal-acts database `adilet.zan.kz`; the Kazakh Wikipedia often gives the history of names (a secondary source — use it as a lead).
+
+## 3. Names: family form, record and surname
+
+- **Surnames from ancestors' names.** A surname may be formed from the name of the father, grandfather or a more distant ancestor, so different surnames do not exclude a common ancestor. Establish when and how the surname became fixed from the family's documents. If the surname may have changed, also search by first name and patronymic without it; take the search fields from the source's current form. According to the PR author's observation, on 27.10.2026 OBD «Мемориал» allowed this through the parameter `s=` without `f=`.
+- **Home form and documentary record.** Scribes rendered Chechen names in a Russified form or in the general Muslim form traditional for Russian documents: for example, the home name Мохьмад might appear in a record as Магомед, Магомад or Мухаммад. Specifically Chechen letters and letter combinations (`хь`, `Ӏ`, `аь`, `оь`, etc.) were dropped or replaced. Compound names were written with a hyphen, as one word, and with different vowels (Абдул-Керим, Абдулкерим, Абдул-Карим). The element «хаджи» in compound names and derived surnames appears as `-хаджи-`, `-хажи-`, `-ходжи-`, `-ходжа-`. Build the variant matrix by `ex-ussr-locale-guide.md`, sections 3–4, and do not merge different forms without agreement of date, place and family cluster.
+- **The "Sex" field and the surname ending.** Indexes contain headings like «Фамилиев(а)» and a "Sex" («Пол») field contradicting the name. Do not infer a person's sex from this field or from the surname ending in the index alone; check the original and the family information already in hand.
+- **Change of surname and patronymic in exile.** In the PR author's field work, family accounts said children were recorded under the surname or patronymic of the relative who raised them. This is a lead to a possible change of record, not an established practice for all special settlers. The surname in a document is recorded as written and does not by itself establish biological kinship. Compare the forms in special-settlement, school and passport documents and after the return; if the difference hampers verification, clarify it with the family, taking into account answers already received.
+
+## 4. The rehabilitation list of the MVD of the Chechen Republic
+
+- **Content of an entry.** According to selective observations by the PR author, cards with the source «МВД Чеченской Республики» (MVD of the Chechen Republic) may contain full name, year of birth, sex and date of rehabilitation, with no place of birth, deportation or special settlement; the patronymic is sometimes omitted. Check the fields of the specific card; do not carry this description over to the whole list.
+- **Copies and independent information.** MVD ChR entries appear in «Открытый список» (Open List), «Бессмертный барак» (Immortal Barracks) and the database «Жертвы политического террора в СССР» (Victims of Political Terror in the USSR, `lists.memo.ru`). If specific cards reproduce one entry, they and their retellings on family pages are one archival item: one Source, with the copies listed in its body (`archive.md`; `evidence-protocol.md`, section 6). The site name or the MVD alone does not make different documents one chain; assess an added document or testimony by its own provenance. Three URLs of one entry do not give three confirmations.
+- **Late origin of the information.** The rehabilitation date and the reported year of birth are different events and claims. Check the year of birth in a late list against early documents. Absence of a person from a specific published selection does not prove they were not deported.
+- **A shared rehabilitation date is a lead.** It may result from a joint application by the family or batch review of different files. If needed, compare suitable entries by surname, patronymic, age and the family circle already known; assess how often the date recurs in the available sample. Record the coincidence itself as an observation, and a presumed shared household as a `Hypothesis -` note; kinship does not follow from it. A family certificate already in hand and a targeted request to the ИЦ МВД по ЧР (Information Centre of the MVD for the Chechen Republic) may help verify it.
+- **Repression before 1944** (dekulakisation, arrests in the 1930s) is researched separately; do not treat the deportation list as an exhaustive source on all repression. Agency routes — section 6.
+
+## 5. The Chechen Republic memory book on OBD «Мемориал»
+
+- According to the PR author's observations, the edition «Память. 1941–1945. Книга 1» (Нальчик: Эль-Фа, 2010) is available in OBD «Мемориал» as page images; on 27.10.2026 the ID `1050800122` was used. The author noted articles on front-line soldiers who returned from the war. For a suitable raion this is an additional route, including after an empty name search; the general sections of OBD and the limits of negative results — `field-lessons.md`, section 4.
+- As described by the PR author, the volume starts with the Heroes of the Soviet Union, followed by raion sections, including raions of present-day Ingushetia and Khasavyurt raion of Dagestan. Check the composition and administrative assignment of the sections against the table of contents. Within each raion the articles are alphabetical; in some raions a supplementary list follows the main list.
+- The PR author found articles not reachable through the name index. If needed, browse the relevant part of the raion section and the supplementary list. Limit a negative result to the pages and name variants actually checked; record the pages and letter range in the `Survey -` note without unnecessary data on neighbouring families.
+- For an OBD card, establish which book entry it reproduces and treat it as part of that entry's Source per `evidence-protocol.md`; the shared volume alone does not make different entries dependent.
+- Secondary consolidated lists of war participants from the ЧИ АССР — the books by M. M. Murdalov et al., «Чеченцы в борьбе с фашизмом» and «ЧИАССР — народ в борьбе с фашизмом. Список участников ВОВ» (paid electronic editions with a free preview). Use their information only as leads and check it against ЦАМО (TsAMO) documents and OBD «Мемориал».
+
+## 6. Special settlement: where to look for documents
+
+- **Grozny.** The official history of the Archive Administration of the Chechen Republic reports mass loss of fonds in 1994–2000, but also the survival of part of the collection of documents of former special settlers. So do not predict the absence of a specific file from the general history of losses: check the inventory and the archive's reply. A search at the place of special settlement is useful in parallel.
+- **Kazakhstan and Kirghizia (Kyrgyzstan).** The personal (registration) files of deportees mostly remained at the place of special settlement; only a small part was transferred in 1967–1968 to the archives of the restored autonomies (Arapkhanova). According to DW on 18.09.2023, citing the Prosecutor General's Office of Kazakhstan, the registration files were transferred to the Archive of the President of the Republic of Kazakhstan; this does not confirm that a specific person's file is there or that the whole transfer is complete. The current official page «Архивная справка» (Archival certificate) has a separate procedure for inquiries about victims of political repression. Use it and check the custodian, the composition of documents and access to the specific file; the former 2008 standard does not substitute for current rules. Establish the custodian of files in Kirghizia (Kyrgyzstan) separately (`seed-sources.md`, section "Caucasus and Central Asia").
+- **Chechen Republic.** According to the page of the Archive Administration of the Government of the Chechen Republic (checked 27.10.2026):
+  - the «Справку о выселении в 1944 г.» (certificate of deportation in 1944) is issued by the Archive Administration of the Government of the ChR;
+  - the rehabilitation certificate — by the ИЦ МВД по Чеченской Республике (Information Centre of the MVD for the Chechen Republic);
+  - information on people repressed before 1944 — ЦА ФСБ России (Central Archive of the FSB of Russia) and ГИАЦ МВД России (Main Information and Analytical Centre of the MVD of Russia);
+  - birth, marriage and death records — the ZAGS archive of the ChR.
+  The rehabilitation certificate may be held by the family itself. If it gives the place of deportation and the place of special settlement, it helps narrow the search; take into account the materials already provided and ask about the certificate only if needed.
+- **Births in exile** were registered by the ZAGS bodies of the Kazakh or Kirghiz SSR. To obtain the act record, determine the current custodian, the eligible applicant and the access procedure from the official instructions of the chosen ZAGS body. Draft requests by `correspondence.md` in the letters folder; the user sends.
+
+## 7. Family documents of the exile period
+
+- Village-council deputy certificates, certificates of honour from sovkhozes and enterprises, work-record books and school documents of 1944–1960s contain the names of the selsoviet, raion, oblast and farm. They may refine the place of special settlement and documented dates of residence, but a single document date does not establish the whole period of residence. Add scans and photographs of such documents through `add-archive-record` as Sources, describing them in the body as images of the original (primary or derivative as applicable), with the place kept as written.
+- In the Kazakh SSR such documents were often in Kazakh (Cyrillic) or bilingual. Useful terms: «куәлік» — certificate, «селолық Советі» — village council (selsoviet), «ауданы» — raion, «облысы» — oblast. The selsoviet name in a Kazakh text may appear in its Kazakh form: translate it with a dictionary, keeping the original spelling verbatim in the transcription.
+
+## 8. Taip and nek'e
+
+- Information on the taip (teip) and nek'e («некъе», a branch within a taip) lives in oral family tradition. It helps formulate questions for older relatives and outline the circle of villages to search, but whether it appears in official documents and what it means for a specific family must be established separately. Record it as oral testimony naming the informant (a Source with `source_type: oral_history`; minimum data on living informants, `privacy-and-safety.md`).
+- Published taip genealogies and lists of surnames by taip (including on Wikipedia) are secondary leads, often without source references. Different publications may date the same migration of a branch more than a century apart. Since surnames are formed from personal names, the same surname occurs in different taips; the presence of a surname in a taip list does not by itself establish kinship. Taip names are rendered in several spellings — choose reasoned variants for the task.
+
+## 9. Access: PR author's observations of 27.10.2026
+
+Below are a contributor's reports on his environment, not a guarantee of current access. Use any of these sites only on the user's explicit instruction for the task (`SKILL.md` § Rules that win); check the chosen route for the task; access rules — `browser-and-captcha.md`.
+
+- **«Открытый список».** Full-text search via the API is disabled (`search-text-disabled`). A title list by prefix (`list=allpages&apprefix=<Фамилия>`) worked; the title includes the year of birth, which helps select the relevant cards. Open individual cards one at a time with pauses. Fetching page text via the API required passing a challenge: do not bypass it; act by `browser-and-captcha.md`, sections 5–5b.
+- **`lists.memo.ru` and `base.memo.ru`** did not respond from the test environment. Archived copies on web.archive.org were used; record the snapshot date in the Source body.
+- **`e-memory.kz`** (the portal of the State Commission of Kazakhstan for the full rehabilitation of victims of political repression): surname search worked, there is a category «Сталинские депортации» (Stalinist deportations), some sections are closed. After several queries on the same day the site stopped responding. Some entries coincide with ДКНБ РК (KNB Department of the Republic of Kazakhstan) materials in «Открытый список» — check the dependence of sources.
+- **OBD «Мемориал».** New memory-book page images opened only in a browser session.
+- **«Память народа».** CAPTCHA check — act by `browser-and-captcha.md`, section 5.
+- **НЭБ (NEB, `rusneb.ru`).** HTTP 403 response demanding that VPN be disabled; from within Russia the site may behave differently.
+- **The site of the Archive Administration of the ChR (`arhiv-chr.ru`)** opened with an ordinary request.
+
+## 10. Basis and limits of verification
+
+- The ru.wikipedia articles [Урус-Мартан](https://ru.wikipedia.org/wiki/Урус-Мартан), [Шали](https://ru.wikipedia.org/wiki/Шали), [Ачхой-Мартан](https://ru.wikipedia.org/wiki/Ачхой-Мартан), [Курчалой](https://ru.wikipedia.org/wiki/Курчалой), [Старые Атаги](https://ru.wikipedia.org/wiki/Старые_Атаги), [Шатой](https://ru.wikipedia.org/wiki/Шатой) were, per the PR author, checked by him on 27.10.2026. The articles cite the 1944 decree of the Presidium of the Supreme Soviet of the RSFSR on renaming the village councils and settlements of Grozny Oblast, and the resolution of the Presidium of the Supreme Soviet of the ЧИ АССР of 14.08.1989. This is a secondary source: for disputed dating, check the text of the decree or resolution itself.
+- [Archive Administration of the Government of the ChR, state services and FAQ](https://arhiv-chr.ru/gosudarstvennyj-uslugi): where to apply for a deportation certificate, a rehabilitation certificate and information on repression before 1944.
+- [Official history of the Archive Administration of the ChR](https://arhiv-chr.ru/ob-arkhivnom-upravlenii/archive-history): losses and the partial survival of the former special settlers' collection; the page was read at review on 27.10.2026.
+- [Resolution on the formation of Grozny Oblast of 22.03.1944, EBID](https://docs.historyrussia.org/ru/nodes/298787-ob-obrazovanii-groznenskoy-oblasti-v-sostave-rsfsr-postanovlenie-ot-22-marta-1944-goda): a published historical document; the card cites the 1946 collection of laws, p. 58.
+- [S. S. Tsutsulaeva. Documents and materials on the deportation of the Chechen people: general problems and the degree of their study (2011)](https://cyberleninka.ru/article/n/dokumenty-i-materialy-o-deportatsii-chechenskogo-naroda-obschie-problemy-i-stepen-ih-izuchennosti): loss of fonds of the National Archive of the ChR.
+- [Arapkhanova. The personal file of a deportee as a historical source](http://modernhistory.ru/f/arapkhanova.pdf): composition of a special settler's personal file and where the files are held.
+- [DW, 18.09.2023](https://www.dw.com/ru/kazahstan-rassekretil-bolee-24-mln-kartocek-zertv-politiceskih-repressij/a-66840108): transfer of special settlers' files to the Archive of the President of Kazakhstan; [Archive of the President of Kazakhstan, current route for archival inquiries](https://archive.president.kz/ru/archive/spravka/) (page read at review on 27.10.2026). A media report is a secondary source on the transfer, not a current inventory.
+- The PR author described the composition of individual MVD ChR entries from «Открытый список» cards, «Бессмертный барак» pages and a web.archive.org snapshot of `lists.memo.ru`. His observations on rehabilitation dates and surname changes are not a check of the coverage of the whole list and need checking in the specific file.
+
+Dates and limits of the checks are given above. A general route does not replace checking the specific record, inventory and access.

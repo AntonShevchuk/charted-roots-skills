@@ -1,0 +1,193 @@
+# gedcom_sync
+
+Reconciles a GEDCOM export of the upstream tree (`--ged`, default `FamilyTree.ged`) against the vault **without creating duplicates**.
+
+## Why this exists
+
+The Charted Roots importer (v0.22.76) does no duplicate detection except for
+Places. Verified in `main.js`:
+
+* `importIndividual` mints a fresh random `cr_id` for every INDI and never
+  looks up `external_id`. The only existence check is a filename-collision
+  avoider producing `Name 1.md`, `Name 2.md`.
+* Sources, Events and Citations behave the same way.
+* `external_id` (INDI xref) and `gedcom_id` (SOUR xref) are **written but
+  never read back** — the join keys are on disk and simply unused.
+* The wizard's "Duplicate handling" radio feeds only `overwriteExisting`,
+  which is read solely by the separate-NOTE-file writer. It is a no-op for
+  person/event/source/place/citation, and its `skip` option — "skip new ones
+  with same cr_id" — can never fire, because `cr_id` is regenerated randomly.
+
+Re-running the wizard therefore adds a second note for every record in the
+export rather than updating the one already there. This script does the join
+the plugin skips.
+
+## Usage
+
+`vault_verify.py` runs the invariant suite alone: no GEDCOM, never writes,
+`--vault` and `--limit` only. It is the baseline before and after any edit,
+not just a sync. `gedcom_sync.py --verify` is an alias for it, kept for the
+History run records that quote it.
+
+    python3 <vault-verify>/scripts/vault_verify.py             # vault invariants, no GEDCOM
+    python3 <vault-verify>/scripts/gedcom_sync.py              # dry run, full report
+    python3 <vault-verify>/scripts/gedcom_sync.py --out r.txt  # also write the report to a file
+    python3 <vault-verify>/scripts/gedcom_sync.py --apply      # write
+    python3 <vault-verify>/scripts/gedcom_sync.py --only person,source
+
+Python 3, standard library only. No dependencies, no venv, no manifest.
+
+`--only person,source,event,citation,place` scopes a run: the report drops
+the sections you did not ask for, and `--apply` runs only those write passes,
+which is how a large sync becomes several reviewable diffs. An unrecognised
+name stops the run rather than silently narrowing it to nothing. It cannot be
+combined with `--create` — new Events name new People by filename and new
+Citations name both, so creating one kind without the others would leave
+dangling links — and it does not apply to `--verify`, whose invariants are
+vault-wide. Only `person`, `source` and `event` have a write pass, so
+`--apply` refuses a scope of `place` or `citation` alone; the Event → GEDCOM
+sidecar is written only when `event` is in scope.
+
+`--verify` and `--apply` are exclusive, and a flag outside the mode it
+belongs to stops the run rather than being ignored: `--out` is dry-run only,
+the three `--allow-*`/`--no-restore-point` overrides are `--apply` only, and
+`--verify` takes none of `--only`, `--ged`, `--create`, `--adopt-by-name`.
+
+The dry run runs the same preflight as `--apply`: a planned change the writer
+would refuse is listed under WOULD REFUSE and the dry run exits 1.
+
+A place the vault already holds is never overwritten. Where the export names
+another place, on an Event's `place:` or a Person's `birth_place:` /
+`death_place:`, the change is held as a `conflict` (or a `coarsen` when the
+export names an ancestor) and listed in section 3. A PLAC that resolves to no
+Place note is compared by its leaf against the Place's title and `aliases:`,
+so adding the export's form to `aliases:` resolves a naming variant. A
+disagreeing pair keyed positionally is usually paired wrong. No ruling can
+write a place that does not resolve to a Place note.
+
+Dates are written in two forms (`crsync/dates.py`). A Person's `born` /
+`died` must pass the plugin's *Validate date formats* command, so `ABT` is
+written `c. 1804`, a range `1850 to 1858`, and `BEF` / `AFT` is dropped to the
+bare date -- the validator has no form for them. The Event keeps the
+qualifier (`date: BEF 1909`), plus `date_precision`. German month names and
+`D.M.YYYY` are read as dates. A respelling that changes nothing but the form
+is a `format` change and is applied like `fill` and `refine`.
+Relationships come from each family's `_FREL` / `_MREL` pedigree, and are
+written only with `--create` (the pass also updates existing notes): birth ->
+`father` / `mother` + `children`; step -> `stepfather` / `stepmother`;
+adopted -> `adoptive_father` / `adoptive_mother`; guardian -> the plugin's
+Guardian relationship, `guardian` on the ward and `ward` on each guardian, both
+with parallel `_id` lists and both written (the plugin does not reciprocate
+it). Foster and unknown pedigrees write nothing. A list the vault already
+holds is extended, never trimmed or reordered.
+
+`fix_person_dates.py` repairs Persons the export does not cover (dry run by
+default; `--apply` needs Obsidian closed and People/Events clean in git).
+
+Exit codes: 0 success; 1 a problem found (failed invariant, refused change,
+regression, refused precondition); 2 the run could not start (bad flags,
+missing vault, unreadable `data.json`, GEDCOM or decisions file).
+
+Dry run is the default; nothing is written without `--apply`, which refuses
+to run until Obsidian is closed, the entity folders are clean in git, and a
+`pre-gedcom-sync-*` tag marks HEAD.
+
+`--create` also writes notes for GEDCOM records with no vault counterpart.
+Add it to a dry run first: section 7 previews every planned note — paths, the
+first of each kind in full, the follow-up relationship and citation passes,
+and everything the planner left for a human.
+
+## Decisions
+
+`coarsen` and `conflict` changes are held back: the vault value is more
+precise, or the two genuinely differ, and applying the export would revert
+curated work. Rulings that accept one anyway live in
+`History/gedcom-sync-decisions.json`, one entry per person and occasion:
+
+    {
+      "external_id": "I100000000001",
+      "label": "Johann Example",
+      "accept_conflict": ["name", "surnames"],
+      "reason": "The register spells it without the umlaut.",
+      "decided_by": "user",
+      "date": "2026-09-21"
+    }
+
+Keyed by the upstream INDI xref, so a rename cannot detach a ruling from the
+person it was made about, and per field, because several of these people have
+a second disagreement that must stay held. Every entry needs a `reason` — it
+is the only record of why the vault's own value lost. With no file, nothing
+is accepted. A malformed file stops the run rather than silently accepting
+nothing, which would revert every ruling. The dry run reports how many held
+changes the rulings still cover.
+
+## Tests
+
+    cd <vault-verify>/scripts && python3 -m unittest discover -s tests -t .
+
+Standard library `unittest`, no dependencies, about two seconds. Two of them
+read the real vault: every note must survive a parse/render cycle
+byte-for-byte, and no frontmatter line may be invisible to the key index.
+They skip if the vault is not there, and never write.
+
+`tests/test_vault_verify.py` runs the invariant CLI end to end;
+`tests/test_cli.py` runs the dry run and `--apply` end to end
+against a throwaway vault with its own git repository, which is what pins the
+report's "N notes modified" to the count `git diff` actually shows.
+
+The method for an actual sync — what to check, in what order, and what the
+script refuses to do — is the `gedcom-sync` skill.
+
+## How it matches
+
+| Entity | Key | Quality |
+|---|---|---|
+| Person | `external_id` ↔ INDI xref | exact |
+| Source | `gedcom_id` ↔ SOUR xref, or the `_Imported from GEDCOM source S…_` line in the body | exact |
+| Event | `<owner>:<TAG>:<ordinal>`, bootstrapped by content then position | most Events key by content; the rest by position, and a handful are indistinguishable and assigned in order |
+| Citation | `(subject_id, source, fact, page)` | exact |
+| Place | the plugin's own `full_name` and `title\|parent` indexes | agrees with the plugin |
+
+**INDI and SOUR xrefs are stable across re-exports**, which is what makes a
+repeated import safe. **FAM xrefs are not** — they are positional integers
+that hosted trees (Ancestry, observed) renumber when a family is inserted;
+one insertion can renumber most of them. Nothing durable may key on a FAM
+xref, so a shared event keys on its couple's two INDI xrefs instead.
+
+`place` is deliberately not part of the Event key: upstream trees often
+record historical and native forms (`Deutschland`, `Preußen`, `Danmark`)
+against a gazetteer in another language, so many PLAC strings do not resolve
+and keying on them would lose the match.
+
+**No counts live in this file.** How many of each resolved, on which export,
+and which decisions were left open are measurements, not method: they go in the run
+record (`History/GEDCOM Reconciliation - Report.md` where the vault keeps
+`History/`) with the date and the export's sha, and they are recomputed rather than trusted. A dry run prints the
+current figures in a few seconds.
+
+## Layout
+
+    <vault-verify>/scripts/gedcom_sync.py      sync CLI
+    <vault-verify>/scripts/vault_verify.py     invariant CLI (also gedcom_sync.py --verify)
+    <vault-verify>/scripts/fix_person_dates.py one-off: born/died into validator-clean forms
+    <vault-verify>/scripts/crsync/vault.py     frontmatter reader/writer (line-preserving)
+    <vault-verify>/scripts/crsync/config.py    folder layout, read from data.json
+    <vault-verify>/scripts/crsync/gedcom.py    GEDCOM parser, incl. EVEN and OBJE
+    <vault-verify>/scripts/crsync/dates.py     date forms, and a port of the plugin's date validator
+    <vault-verify>/scripts/crsync/places.py    the plugin's place cache semantics
+    <vault-verify>/scripts/crsync/match.py     Person and Source joins
+    <vault-verify>/scripts/crsync/events.py    the Event key cascade
+    <vault-verify>/scripts/crsync/citations.py Citation join
+    <vault-verify>/scripts/crsync/verify.py    the invariant suite
+    <vault-verify>/scripts/crsync/report.py    the dry-run report and the --apply log
+    <vault-verify>/scripts/crsync/apply.py     the write layer, and its preconditions
+    <vault-verify>/scripts/crsync/create.py    new notes for records with no counterpart
+    <vault-verify>/scripts/crsync/decisions.py the accepted-ruling file and its validation
+    <vault-verify>/scripts/tests/              unittest suite
+
+The writer is a **line patcher**, never a serialiser: it replaces only the
+lines of the keys it changes, so every other byte of a note is untouched and
+a run produces a reviewable diff. Round-trip is byte-identical across
+every note in the vault -- asserted by `tests/test_vault.py`, which
+reads them all, rather than claimed by a number here that goes stale
+as the vault grows.
