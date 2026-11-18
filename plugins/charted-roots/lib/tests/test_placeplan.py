@@ -224,6 +224,29 @@ class Basename(unittest.TestCase):
             "Wrocław, Lower Silesian Voivodeship, Poland")
 
 
+class AssignBasenames(unittest.TestCase):
+    def _note(self, name, cr_id=""):
+        fm = f"---\ncr_type: place\ncr_id: {cr_id}\n---\n"
+        return vault.parse_text(fm, f"/v/Places/{name}.md")
+
+    def test_a_clash_gets_the_parent_and_created_keep_their_names(self):
+        plan = _chain()
+        plan.places["poland"].status = "created"
+        plan.places["poland"].cr_id = "pol-111-aaa-111"
+        plan.places["poland"].file = "Places/Poland.md"
+        plan.places["dup"] = PlannedPlace(
+            key="dup", title="Wrocław", place_type="city",
+            parent="poland", status="proposed")
+        existing = [self._note("Poland", "pol-111-aaa-111"),
+                    self._note("wrocław")]
+        names = placeplan.assign_basenames(plan, existing)
+        self.assertEqual(names, {
+            "poland": "Poland",
+            "lower-silesia": "Lower Silesian Voivodeship",
+            "wroclaw": "Wrocław, Lower Silesian Voivodeship",
+            "dup": "Wrocław, Poland"})
+
+
 class Render(unittest.TestCase):
     def _render(self, key):
         plan = _chain()
@@ -385,6 +408,54 @@ class Check(VaultCase):
         plan.places["lower-silesia"].status = "proposed"
         out = self._check(plan)
         self.assertTrue(any(p.startswith("wroclaw: ") and "parent" in p
+                            for p in out), out)
+
+    def test_an_approved_string_on_an_unapproved_place(self):
+        plan = _chain()
+        plan.places["wroclaw"].status = "proposed"
+        out = self._check(plan)
+        self.assertTrue(any(p.startswith("Breslau, Schlesien, Preußen: ")
+                            and "place 'wroclaw' is not approved" in p
+                            for p in out), out)
+
+    def test_an_approved_string_that_maps_nowhere(self):
+        plan = _chain()
+        plan.plac["Posen"] = PlacEntry(plac="Posen", status="approved")
+        out = self._check(plan)
+        self.assertTrue(any(p.startswith("Posen: ") and "no place" in p
+                            for p in out), out)
+
+    def test_duplicates_an_existing_note_by_title_and_parent(self):
+        existing = self._existing(
+            ("Poland", dict(cr_id="exi-111-sti-111", title="Poland",
+                            place_type="country", full_name="Poland")),
+            ("Wroclaw", dict(cr_id="exi-222-sti-222", title="Wrocław",
+                             place_type="city",
+                             parent_place='"[[Lower Silesian Voivodeship]]"',
+                             full_name="Wroclaw, Poland")),
+            ("Lower Silesian Voivodeship", dict(
+                cr_id="exi-333-sti-333", title="Lower Silesian Voivodeship",
+                place_type="state", parent_place='"[[Poland]]"',
+                full_name="Lower Silesian Voivodeship, Poland")))
+        plan = _chain()
+        for k in ("poland", "lower-silesia"):
+            plan.places[k].status = "created"
+        plan.places["poland"].cr_id = "exi-111-sti-111"
+        plan.places["poland"].file = f"{FOLDERS['places']}/Poland.md"
+        plan.places["lower-silesia"].cr_id = "exi-333-sti-333"
+        plan.places["lower-silesia"].file = (
+            f"{FOLDERS['places']}/Lower Silesian Voivodeship.md")
+        out = self._check(plan, existing)
+        self.assertTrue(any(p.startswith("wroclaw: ")
+                            and "title and parent" in p for p in out), out)
+
+    def test_a_created_place_whose_note_is_missing(self):
+        plan = _chain()
+        plan.places["poland"].status = "created"
+        plan.places["poland"].cr_id = "gon-111-eee-111"
+        plan.places["poland"].file = f"{FOLDERS['places']}/Poland.md"
+        out = self._check(plan, [])
+        self.assertTrue(any(p.startswith("poland: ") and "note was not found" in p
                             for p in out), out)
 
     def test_check_writes_nothing(self):

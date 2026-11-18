@@ -309,6 +309,14 @@ def _validate(plan: Plan, cfg: config.Config) -> list[str]:
             problems.append(f"{plac}: unknown status {e.status!r}")
         if e.place and e.place not in plan.places:
             problems.append(f"{plac}: place {e.place!r} not in plan")
+        if e.status == "approved" and not (e.not_place or e.unidentified):
+            target = plan.places.get(e.place)
+            if not e.place:
+                problems.append(f"{plac}: approved, but maps to no place")
+            elif target is not None and target.status not in {
+                    "approved", "created"}:
+                problems.append(
+                    f"{plac}: approved, but place {e.place!r} is not approved")
     return problems
 
 
@@ -324,6 +332,32 @@ def _existing_note(place: PlannedPlace, existing: list, cfg: config.Config):
     return None
 
 
+def assign_basenames(plan: Plan, existing: list) -> dict:
+    """Plan key -> note basename, for every place in the plan.
+
+    A created place keeps its note's name. The rest are named in a fixed
+    order, approved before proposed and otherwise in plan order, each taking
+    a name no existing note or earlier place holds. `check` and `apply_plan`
+    both call this, so the names they use cannot differ.
+    """
+    taken = {n.basename for n in existing}
+    out = {}
+    for key, p in plan.places.items():
+        if p.status != "created":
+            continue
+        note = next((n for n in existing
+                     if p.cr_id and n.scalar("cr_id") == p.cr_id), None)
+        out[key] = (note.basename if note is not None
+                    else os.path.splitext(os.path.basename(p.file))[0]
+                    or p.title)
+    pending = [k for k, p in plan.places.items() if p.status != "created"]
+    pending.sort(key=lambda k: plan.places[k].status != "approved")
+    for key in pending:
+        out[key] = basename_for(plan.places[key], plan, taken)
+        taken.add(out[key])
+    return out
+
+
 def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
     """Problems that must be fixed before `apply`; an empty list means OK.
 
@@ -334,38 +368,32 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
     problems = _validate(plan, cfg)
 
     # Note names and ids: real for created places, simulated for the rest.
-    taken_names = {n.basename for n in existing}
+    basenames = assign_basenames(plan, existing)
     taken_ids = {n.scalar("cr_id") for n in existing if n.scalar("cr_id")}
     taken_ids |= {p.cr_id for p in plan.places.values() if p.cr_id}
-    basenames, cr_ids, real, fresh = {}, {}, {}, {}
+    cr_ids, real, fresh, pending = {}, {}, {}, []
     for key, p in plan.places.items():
         if p.status != "created":
+            pending.append(key)
             continue
         note = _existing_note(p, existing, cfg)
         if note is None:
             problems.append(f"{key}: created, but its note was not found")
-            basenames[key] = os.path.splitext(os.path.basename(p.file))[0] \
-                or p.title
             continue
         real[key] = note
-        basenames[key] = note.basename
         cr_ids[key] = note.scalar("cr_id") or p.cr_id
-    pending = [k for k, p in plan.places.items() if p.status != "created"]
-    pending.sort(key=lambda k: plan.places[k].status != "approved")
+    for key in pending:
+        cr_ids[key] = create.mint_cr_id(taken_ids)
     for key in pending:
         p = plan.places[key]
-        basenames[key] = basename_for(p, plan, taken_names)
-        taken_names.add(basenames[key])
-        cr_ids[key] = create.mint_cr_id(taken_ids)
         if p.status == "approved":
             if p.parent in plan.places and plan.places[p.parent].status not in {
                     "approved", "created"}:
                 problems.append(
                     f"{key}: approved, but parent {p.parent!r} is not")
-            note = vault.parse_text(
+            fresh[key] = vault.parse_text(
                 render_note(p, plan, basenames, cr_ids),
                 os.path.join(cfg.places, basenames[key] + ".md"))
-            fresh[key] = note
 
     # A non-created place must not duplicate a note the plugin already sees.
     current = places.Index(list(existing))
