@@ -10,7 +10,7 @@ from __future__ import annotations
 import unittest
 
 from crsync import apply as apply_mod
-from crsync import decisions, events, gedcom, match, places, vault
+from crsync import create, decisions, events, gedcom, match, places, vault
 
 from .helpers import FOLDERS, VaultCase, frontmatter, ged
 
@@ -138,11 +138,7 @@ class PersonPlace(PlaceCase):
         self.assertIn("born", [c.field for c in safe])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-class AliasFallback(PlaceCase):
+class AliasCase(PlaceCase):
 
     def setUp(self):
         super().setUp()
@@ -172,6 +168,9 @@ class AliasFallback(PlaceCase):
     def load(self, approved):
         return places.load(self.cfg.places, approved=approved)
 
+
+class AliasFallback(AliasCase):
+
     def test_an_approved_historical_place_resolves(self):
         p = "Breslau, Schlesien, Preußen, Deutschland"
         self.assertEqual(self.load({places.key(p)}).find(p).basename, "Wrocław")
@@ -199,3 +198,111 @@ class AliasFallback(PlaceCase):
                    place_type="city", historical_names=["Lemberg"])
         p = "Lemberg, Galizien"
         self.assertEqual(self.load({places.key(p)}).find(p).basename, "Lviv")
+
+    # -- the approved input may carry each string's target ----------------
+
+    PLAC = "Breslau, Schlesien, Preußen, Deutschland"
+
+    def later_rival(self):
+        """A Place added after review that outscores Wrocław for PLAC."""
+        self.place("Prussia", title="Prussia", full_name="Prussia",
+                   place_type="state", aliases=["Preußen"])
+        self.place("Silesia Province", title="Silesia Province",
+                   full_name="Silesia Province, Prussia", place_type="state",
+                   parent_place='"[[Prussia]]"', aliases=["Schlesien"])
+        self.place("Breslau Bis", title="Breslau Bis",
+                   full_name="Breslau Bis, Silesia Province, Prussia",
+                   place_type="city",
+                   parent_place='"[[Silesia Province]]"', aliases=["Breslau"])
+
+    def test_a_target_dict_accepts_the_planned_place(self):
+        idx = self.load({places.key(self.PLAC): "ppp-007-ppp-000"})
+        self.assertEqual(idx.find(self.PLAC).basename, "Wrocław")
+
+    def test_a_later_place_that_outscores_the_target_gives_no_link(self):
+        self.later_rival()
+        # the set form is unchanged: the rival wins
+        self.assertEqual(self.load({places.key(self.PLAC)}).find(
+            self.PLAC).basename, "Breslau Bis")
+        idx = self.load({places.key(self.PLAC): "ppp-007-ppp-000"})
+        self.assertIsNone(idx.find(self.PLAC))
+
+    def test_a_target_without_a_cr_id_is_the_vault_relative_file(self):
+        self.write(f"{FOLDERS['places']}/Hamburg.md", frontmatter(
+            cr_type="place", title="Hamburg", full_name="Hamburg",
+            place_type="city", aliases=["Hammaburg"]))
+        p = "Hammaburg, Sachsen"
+        rel = f"{FOLDERS['places']}/Hamburg.md"
+        self.assertEqual(self.load({places.key(p): rel}).find(p).basename,
+                         "Hamburg")
+        self.assertIsNone(self.load({places.key(p): "Elsewhere/Hamburg.md"})
+                          .find(p))
+        # no identity yet (a target not applied): nothing to pin, as a set
+        self.assertEqual(self.load({places.key(p): ""}).find(p).basename,
+                         "Hamburg")
+
+
+class UnapprovedAliasNeverLinks(AliasCase):
+    """No write path may link a PLAC through an alias the plan has not approved."""
+
+    PLAC = "Breslau, Schlesien, Preußen, Deutschland"
+
+    def tree(self) -> gedcom.Tree:
+        return gedcom.parse(ged(
+            "0 HEAD\n1 CHAR UTF-8\n"
+            "0 @I1@ INDI\n1 NAME Vera /Test/\n1 SEX F\n"
+            f"1 BIRT\n2 DATE 1829\n2 PLAC {self.PLAC}\n"
+            "1 FAMS @F1@\n0 @I2@ INDI\n1 NAME Karl /Test/\n1 FAMS @F1@\n"
+            "0 @F1@ FAM\n1 HUSB @I2@\n1 WIFE @I1@\n1 MARR\n2 DATE 1850\n"
+            f"2 PLAC {self.PLAC}\n0 TRLR\n"))
+
+    def approved(self):
+        return {places.key(self.PLAC)}
+
+    def event_place_changes(self, idx):
+        path = self.write(f"{FOLDERS['events']}/Birth of Vera Test.md",
+                          frontmatter(cr_type="event", cr_id="eee-000-eee-000",
+                                      event_type="birth",
+                                      date_precision="unknown"))
+        pair = events.Pair(vault_note=vault.parse(path),
+                           ged_event=self.tree().individuals["I1"].events[0],
+                           stage="positional")
+        return [c for c in events.event_changes(pair, idx, match.Change)
+                if c.field == "place"]
+
+    def test_the_event_place_fill(self):
+        self.assertEqual(self.event_place_changes(self.load(set())), [])
+        self.assertEqual(self.event_place_changes(self.load(None)), [])
+        got = self.event_place_changes(self.load(self.approved()))
+        self.assertEqual([c.new for c in got], ["[[Wrocław]]"])
+
+    def marriage_rels(self, idx):
+        self.person("Vera Test", cr_id="aaa-000-aaa-001", external_id="I1")
+        self.person("Karl Test", cr_id="aaa-000-aaa-002", external_id="I2")
+        notes = list(vault.iter_notes(self.cfg.people))
+        rels, _ = create.relationship_updates(
+            self.tree(), self.cfg, notes, [], idx)
+        return rels
+
+    def test_the_spouse_marriage_location(self):
+        for idx in (self.load(set()), self.load(None)):
+            rels = self.marriage_rels(idx)
+            self.assertNotIn("spouse1_marriage_location", rels["I1"])
+        rels = self.marriage_rels(self.load(self.approved()))
+        self.assertEqual(rels["I1"]["spouse1_marriage_location"], "[[Wrocław]]")
+
+    def fills(self, idx):
+        self.person("Vera Test", external_id="I1", sex="F")
+        note = next(vault.iter_notes(self.cfg.people))
+        return match._place_fills(note, self.tree().individuals["I1"], idx)
+
+    def test_the_person_back_fill(self):
+        self.assertEqual(self.fills(self.load(set())), [])
+        self.assertEqual(self.fills(self.load(None)), [])
+        got = self.fills(self.load(self.approved()))
+        self.assertEqual([(c.field, c.new) for c in got],
+                         [("birth_place", "[[Wrocław]]")])
+
+
+if __name__ == "__main__":
+    unittest.main()

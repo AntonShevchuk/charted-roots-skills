@@ -431,6 +431,28 @@ class HistoricalPlaces(CliCase):
         self.assertEqual(code, 0, err)
         self.assertIn('birth_place: "[[Wrocław]]"', out)
 
+    def test_a_later_place_cannot_take_an_approved_link(self):
+        self.write("History/places-plan.json", json.dumps({
+            "version": 1,
+            "places": {"wroclaw": {"title": "Wrocław", "place_type": "city",
+                                   "status": "created",
+                                   "cr_id": "ppp-111-ppp-111"}},
+            "plac": {self.PLAC: {"count": 1, "place": "wroclaw",
+                                 "status": "approved"}}}, ensure_ascii=False))
+        for name, extra in (
+                ("Prussia", dict(aliases=["Preußen"])),
+                ("Silesia Province", dict(aliases=["Schlesien"],
+                                          parent_place='"[[Prussia]]"')),
+                ("Breslau Bis", dict(aliases=["Breslau"],
+                                     parent_place='"[[Silesia Province]]"'))):
+            self.write(f"{FOLDERS['places']}/{name}.md", frontmatter(
+                cr_type="place", cr_id=f"rrr-{len(name):03}-rrr-000",
+                title=name, full_name=name, place_type="city", **extra))
+        code, out, err = self.run_cli("--create")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("[[Breslau Bis]]", out)
+        self.assertNotIn("[[Wrocław]]", out)
+
     def test_sync_ignores_an_unapproved_alias_match(self):
         self.plan("proposed")
         code, out, err = self.run_cli("--create")

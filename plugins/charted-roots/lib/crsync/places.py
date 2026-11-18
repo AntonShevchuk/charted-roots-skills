@@ -9,6 +9,7 @@ the notes that are invisible to the plugin's matcher.
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 
@@ -61,12 +62,36 @@ def key(place: str) -> str:
     return unicodedata.normalize("NFC", normalise(place)).casefold()
 
 
-class Index:
-    """The plugin's two lookups, plus a note of what they cannot see."""
+def note_is(note, target: str) -> bool:
+    """Whether `note` is the place a target names: its `cr_id`, else its file.
 
-    def __init__(self, notes: list, approved: set | None = None):
+    A target is a `cr_id`, or a vault-relative file path for a note without
+    one. The empty target is a place with no note yet, which nothing can pin
+    down, so it accepts any hit as a set would.
+    """
+    if not target:
+        return True
+    crid = note.scalar("cr_id")
+    if crid:
+        return crid == target
+    want = os.path.normpath(target)
+    return os.path.normpath(note.path).endswith(os.sep + want)
+
+
+class Index:
+    """The plugin's two lookups, plus a note of what they cannot see.
+
+    `approved` holds the normalised historical PLAC strings the plan approves:
+    a set, or a dict from each string to the identity of its target (see
+    `note_is`). With a dict, an alias hit is accepted only on that target, so
+    a Place added after the review cannot quietly take the link.
+    """
+
+    def __init__(self, notes: list, approved: set | dict | None = None):
         self.notes = notes
         self.approved = approved
+        self._found: dict = {}
+        self._leaf_parent: dict = {}
         self.by_full_name: dict = {}
         self.by_title_parent: dict = {}
         self.invisible: list = []
@@ -76,6 +101,11 @@ class Index:
             if full:
                 self.by_full_name.setdefault(key(full), n)
             parent = n.scalar("parent_place")
+            bare_parent = (parent or "").strip().removeprefix(
+                "[[").removesuffix("]]")
+            self._leaf_parent.setdefault(
+                (key(n.scalar("title") or ""),
+                 key(bare_parent.split("|")[0])), n)
             if n.scalar("title") and parent:
                 bare = parent.strip().removeprefix("[[").removesuffix("]]")
                 self.by_title_parent.setdefault(
@@ -95,21 +125,37 @@ class Index:
         if not place:
             return None
         k = key(place)
+        if k not in self._found:     # the index never changes after building
+            self._found[k] = self._find(place, k)
+        return self._found[k]
+
+    def _find(self, place: str, k: str):
         hit = self.by_full_name.get(k)
         if hit is not None:
             return hit
         parts = normalise(place).split(", ")
         if len(parts) >= 2:
             # The plugin's second lookup: leaf title against its parent's name.
-            for n in self.notes:
-                if key(n.scalar("title") or "") == key(parts[0]):
-                    parent = (n.scalar("parent_place") or "").strip()
-                    bare = parent.removeprefix("[[").removesuffix("]]")
-                    if key(bare.split("|")[0]) == key(", ".join(parts[1:])):
-                        return n
+            hit = self._leaf_parent.get((key(parts[0]), key(", ".join(parts[1:]))))
+            if hit is not None:
+                return hit
         if self.approved and k in self.approved:
-            return self._by_alias(parts)
+            hit = self._by_alias(parts)
+            if (hit is not None and isinstance(self.approved, dict)
+                    and not note_is(hit, self.approved[k])):
+                return None
+            return hit
         return None
+
+    def _alias_tables(self) -> tuple:
+        """Name key -> notes answering to it, and each note's ancestor names."""
+        if not hasattr(self, "_by_name"):
+            self._by_name: dict = {}
+            self._above: dict = {}
+            for n in self.notes:
+                for name in self.names(n):
+                    self._by_name.setdefault(name, []).append(n)
+        return self._by_name, self._above
 
     def _by_alias(self, parts: list):
         """The unique best Place whose names fit an approved historical PLAC.
@@ -117,15 +163,16 @@ class Index:
         The leaf must equal a name exactly; each further segment that equals
         a name of an ancestor adds a point. A tie is no link.
         """
-        leaf = key(parts[0])
+        by_name, above_of = self._alias_tables()
         rest = [key(p) for p in parts[1:]]
         scored = []
-        for n in self.notes:
-            if leaf not in self.names(n):
-                continue
-            above = set()
-            for a in self.ancestors(n):
-                above |= self.names(a)
+        for n in by_name.get(key(parts[0]), []):
+            if n.path not in above_of:
+                above = set()
+                for a in self.ancestors(n):
+                    above |= self.names(a)
+                above_of[n.path] = above
+            above = above_of[n.path]
             scored.append((sum(1 for r in rest if r in above), n))
         if not scored:
             return None
@@ -216,5 +263,5 @@ def _same_name(leaf: str, names: set) -> bool:
     return False
 
 
-def load(folder: str, approved: set | None = None) -> Index:
+def load(folder: str, approved: set | dict | None = None) -> Index:
     return Index(list(vault.iter_notes(folder)), approved)

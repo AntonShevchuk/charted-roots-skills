@@ -165,9 +165,9 @@ def _reconcile(cfg: config.Config, opts: Options) -> Reconciliation:
     citation_notes = list(vault.iter_notes(cfg.citations))
     plan_warning = ""
     try:
-        approved = placeplan.approved_placs(placeplan.load(cfg.root))
+        approved = placeplan.approved_targets(placeplan.load(cfg.root))
     except placeplan.PlanError as exc:
-        approved = set()
+        approved = {}
         plan_warning = (f"{exc}; alias matching is off for this run "
                         f"(no historical place is linked)")
     place_index = places.load(cfg.places, approved=approved)

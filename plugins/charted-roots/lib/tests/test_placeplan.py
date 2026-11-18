@@ -80,6 +80,24 @@ class Approved(VaultCase):
         self.assertEqual(self._set("approved", "approved"), {k})
         self.assertEqual(self._set("approved", "created"), {k})
 
+    def test_targets_carry_the_cr_id_else_the_file(self):
+        plan = Plan(
+            places={"a": PlannedPlace(key="a", title="A", place_type="city",
+                                      status="created", cr_id="aaa-1",
+                                      file="P/A.md"),
+                    "b": PlannedPlace(key="b", title="B", place_type="city",
+                                      status="created", file="P/B.md"),
+                    "c": PlannedPlace(key="c", title="C", place_type="city",
+                                      status="approved")},
+            plac={"One": PlacEntry(plac="One", place="a", status="approved"),
+                  "Two": PlacEntry(plac="Two", place="b", status="approved"),
+                  "Three": PlacEntry(plac="Three", place="c",
+                                     status="approved")})
+        self.assertEqual(placeplan.approved_targets(plan),
+                         {"one": "aaa-1", "two": "P/B.md", "three": ""})
+        self.assertEqual(placeplan.approved_placs(plan),
+                         {"one", "two", "three"})
+
     def test_unidentified_and_not_place_are_excluded(self):
         self.assertEqual(
             self._set("approved", "approved", unidentified="x"), set())

@@ -123,16 +123,26 @@ def load(root: str) -> Plan:
     return plan
 
 
-def approved_placs(plan: Plan) -> set[str]:
-    """Normalised PLAC keys whose mapping and target place are both approved."""
-    out = set()
+def approved_targets(plan: Plan) -> dict[str, str]:
+    """Approved PLAC key -> its target's identity: `cr_id`, else its file.
+
+    A PLAC counts when its mapping and target place are both approved. The
+    identity is what `places.Index` compares an alias hit against; it is empty
+    for a target that has no note yet, which then accepts any hit.
+    """
+    out = {}
     for e in plan.plac.values():
         if e.status != "approved" or not e.place or e.not_place or e.unidentified:
             continue
         target = plan.places.get(e.place)
         if target is not None and target.status in {"approved", "created"}:
-            out.add(places.key(e.plac))
+            out[places.key(e.plac)] = target.cr_id or target.file
     return out
+
+
+def approved_placs(plan: Plan) -> set[str]:
+    """Normalised PLAC keys whose mapping and target place are both approved."""
+    return set(approved_targets(plan))
 
 
 def count_placs(tree: gedcom.Tree) -> Counter:
@@ -467,19 +477,29 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
             problems.append(
                 f"{key}: already exists as '{hit.basename}' (same {how})")
 
-    # Every approved string must resolve to its own planned place.
+    # Every approved string must resolve to its own planned place. The index
+    # gets the targets, as the sync does, so a hit on any other place is none.
     approved = approved_placs(plan)
-    on_disk = {n.path: n for n in real.values()}
-    index = places.Index([on_disk.get(n.path, n) for n in existing]
-                         + list(fresh.values()), approved=approved)
+    targets = approved_targets(plan)
     expected = {**real, **fresh}
+    for plac, e in plan.plac.items():
+        if places.key(plac) in approved and e.place in expected:
+            note = expected[e.place]
+            targets[places.key(plac)] = (cr_ids.get(e.place)
+                                         or os.path.relpath(
+                                             note.path, cfg.root))
+    on_disk = {n.path: n for n in real.values()}
+    notes = [on_disk.get(n.path, n) for n in existing] + list(fresh.values())
+    index = places.Index(notes, approved=targets)
+    loose = places.Index(notes, approved=approved)    # to name a wrong hit
     for plac, e in plan.plac.items():
         if places.key(plac) not in approved or e.place not in expected:
             continue
         want = expected[e.place]
         got = index.find(plac)
         if got is not want:
-            where = f"'{got.basename}'" if got is not None else "no Place"
+            other = loose.find(plac)
+            where = f"'{other.basename}'" if other is not None else "no Place"
             problems.append(
                 f"{plac}: resolves to {where}, not its planned place "
                 f"{e.place!r} ('{want.basename}')")
