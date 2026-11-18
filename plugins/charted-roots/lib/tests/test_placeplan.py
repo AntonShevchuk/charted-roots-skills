@@ -98,6 +98,22 @@ class Approved(VaultCase):
         self.assertEqual(placeplan.approved_placs(plan),
                          {"one", "two", "three"})
 
+    def test_an_approved_target_not_yet_applied_takes_no_alias_link(self):
+        self.write(f"{FOLDERS['places']}/Breslau Hamlet.md", frontmatter(
+            cr_type="place", cr_id="hhh-111-hhh-111", title="Breslau Hamlet",
+            full_name="Breslau Hamlet", place_type="locality",
+            aliases=["Breslau"]))
+        plan = Plan(
+            places={"wroclaw": PlannedPlace(
+                key="wroclaw", title="Wroc\u0142aw", place_type="city",
+                aliases=["Breslau"], status="approved")},
+            plac={"Breslau, Deutschland": PlacEntry(
+                plac="Breslau, Deutschland", place="wroclaw",
+                status="approved")})
+        idx = places.load(self.cfg.places,
+                          approved=placeplan.approved_targets(plan))
+        self.assertIsNone(idx.find("Breslau, Deutschland"))
+
     def test_unidentified_and_not_place_are_excluded(self):
         self.assertEqual(
             self._set("approved", "approved", unidentified="x"), set())
@@ -698,6 +714,9 @@ class RealNote(VaultCase):
         self.assertEqual(res.aliased, [f"{FOLDERS['places']}/Wrocław.md"])
         idx = places.load(self.cfg.places,
                           approved=placeplan.approved_placs(plan))
+        self.assertEqual(idx.find("Wratislavia, Schlesien").basename, "Wrocław")
+        idx = places.load(self.cfg.places,
+                          approved=placeplan.approved_targets(plan))
         self.assertEqual(idx.find("Wratislavia, Schlesien").basename, "Wrocław")
 
     def test_an_existing_key_is_never_overwritten_by_extract(self):

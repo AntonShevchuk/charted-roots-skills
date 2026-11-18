@@ -66,11 +66,11 @@ def note_is(note, target: str) -> bool:
     """Whether `note` is the place a target names: its `cr_id`, else its file.
 
     A target is a `cr_id`, or a vault-relative file path for a note without
-    one. The empty target is a place with no note yet, which nothing can pin
-    down, so it accepts any hit as a set would.
+    one. The empty target is a place with no note yet, so any note that
+    answers to the alias is the wrong one and none matches.
     """
     if not target:
-        return True
+        return False
     crid = note.scalar("cr_id")
     if crid:
         return crid == target

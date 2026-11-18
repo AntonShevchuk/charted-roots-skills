@@ -237,9 +237,8 @@ class AliasFallback(AliasCase):
                          "Hamburg")
         self.assertIsNone(self.load({places.key(p): "Elsewhere/Hamburg.md"})
                           .find(p))
-        # no identity yet (a target not applied): nothing to pin, as a set
-        self.assertEqual(self.load({places.key(p): ""}).find(p).basename,
-                         "Hamburg")
+        # no identity yet (a target not applied): any hit is the wrong note
+        self.assertIsNone(self.load({places.key(p): ""}).find(p))
 
 
 class UnapprovedAliasNeverLinks(AliasCase):

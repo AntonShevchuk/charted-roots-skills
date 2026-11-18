@@ -420,7 +420,8 @@ class HistoricalPlaces(CliCase):
         self.write("History/places-plan.json", json.dumps({
             "version": 1,
             "places": {"wroclaw": {"title": "Wrocław", "place_type": "city",
-                                   "status": "approved"}},
+                                   "status": "created",
+                                   "cr_id": "ppp-111-ppp-111"}},
             "plac": {self.PLAC: {"count": 1, "place": "wroclaw",
                                  "status": status}}},
             ensure_ascii=False))
