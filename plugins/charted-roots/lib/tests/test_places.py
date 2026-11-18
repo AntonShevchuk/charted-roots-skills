@@ -140,3 +140,62 @@ class PersonPlace(PlaceCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AliasFallback(PlaceCase):
+
+    def setUp(self):
+        super().setUp()
+        self.place("Poland", title="Poland", full_name="Poland",
+                   place_type="country")
+        self.place("Lower Silesian Voivodeship",
+                   title="Lower Silesian Voivodeship",
+                   full_name="Lower Silesian Voivodeship, Poland",
+                   place_type="state", parent_place='"[[Poland]]"',
+                   aliases=["Schlesien"])
+        self.place("Wrocław", title="Wrocław",
+                   full_name="Wrocław, Lower Silesian Voivodeship, Poland",
+                   place_type="city",
+                   parent_place='"[[Lower Silesian Voivodeship]]"',
+                   aliases=["Breslau"])
+        self.place("Hesse", title="Hesse", full_name="Hesse",
+                   place_type="state", aliases=["Hessen"])
+        self.place("Saxony", title="Saxony", full_name="Saxony",
+                   place_type="state")
+        self.place("Neustadt, Hesse", title="Neustadt",
+                   full_name="Neustadt, Hesse", place_type="city",
+                   parent_place='"[[Hesse]]"')
+        self.place("Neustadt, Saxony", title="Neustadt",
+                   full_name="Neustadt, Saxony", place_type="city",
+                   parent_place='"[[Saxony]]"')
+
+    def load(self, approved):
+        return places.load(self.cfg.places, approved=approved)
+
+    def test_an_approved_historical_place_resolves(self):
+        p = "Breslau, Schlesien, Preußen, Deutschland"
+        self.assertEqual(self.load({places.key(p)}).find(p).basename, "Wrocław")
+
+    def test_an_unapproved_one_does_not(self):
+        p = "Breslau, Schlesien, Preußen, Deutschland"
+        self.assertIsNone(self.load(set()).find(p))
+        self.assertIsNone(self.load(None).find(p))
+
+    def test_a_tie_is_no_link(self):
+        p = "Neustadt, Preußen"
+        self.assertIsNone(self.load({places.key(p)}).find(p))
+
+    def test_the_better_supported_candidate_wins(self):
+        p = "Neustadt, Hessen"
+        hit = self.load({places.key(p)}).find(p)
+        self.assertEqual(hit.basename, "Neustadt, Hesse")
+
+    def test_plugin_lookups_still_come_first(self):
+        p = "Wrocław, Lower Silesian Voivodeship, Poland"
+        self.assertEqual(self.load(None).find(p).basename, "Wrocław")
+
+    def test_historical_names_count_as_names(self):
+        self.place("Lviv", title="Lviv", full_name="Lviv, Ukraine",
+                   place_type="city", historical_names=["Lemberg"])
+        p = "Lemberg, Galizien"
+        self.assertEqual(self.load({places.key(p)}).find(p).basename, "Lviv")

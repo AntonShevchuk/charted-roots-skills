@@ -64,8 +64,9 @@ def key(place: str) -> str:
 class Index:
     """The plugin's two lookups, plus a note of what they cannot see."""
 
-    def __init__(self, notes: list):
+    def __init__(self, notes: list, approved: set | None = None):
         self.notes = notes
+        self.approved = approved
         self.by_full_name: dict = {}
         self.by_title_parent: dict = {}
         self.invisible: list = []
@@ -106,7 +107,31 @@ class Index:
                     bare = parent.removeprefix("[[").removesuffix("]]")
                     if key(bare.split("|")[0]) == key(", ".join(parts[1:])):
                         return n
+        if self.approved and k in self.approved:
+            return self._by_alias(parts)
         return None
+
+    def _by_alias(self, parts: list):
+        """The unique best Place whose names fit an approved historical PLAC.
+
+        The leaf must equal a name exactly; each further segment that equals
+        a name of an ancestor adds a point. A tie is no link.
+        """
+        leaf = key(parts[0])
+        rest = [key(p) for p in parts[1:]]
+        scored = []
+        for n in self.notes:
+            if leaf not in self.names(n):
+                continue
+            above = set()
+            for a in self.ancestors(n):
+                above |= self.names(a)
+            scored.append((sum(1 for r in rest if r in above), n))
+        if not scored:
+            return None
+        top = max(s for s, _ in scored)
+        best = [n for s, n in scored if s == top]
+        return best[0] if len(best) == 1 else None
 
     # -- comparing a vault link with a GEDCOM PLAC ----------------------
 
@@ -134,7 +159,7 @@ class Index:
     def names(note) -> set:
         """Every name a Place note answers to, as match keys."""
         forms = [note.scalar("title"), note.scalar("name"), note.basename,
-                 *note.as_list("aliases")]
+                 *note.as_list("aliases"), *note.as_list("historical_names")]
         return {key(f) for f in forms if f}
 
     def compare(self, link: str, plac: str) -> str:
@@ -191,5 +216,5 @@ def _same_name(leaf: str, names: set) -> bool:
     return False
 
 
-def load(folder: str) -> Index:
-    return Index(list(vault.iter_notes(folder)))
+def load(folder: str, approved: set | None = None) -> Index:
+    return Index(list(vault.iter_notes(folder)), approved)
