@@ -7,7 +7,7 @@ description: Use when adding an archival document to the vault — a scan, regis
 
 One archival item becomes: scan + transcription in the archive folder, one Source, Events, one Citation per person × fact, and Person updates. The rules are in the core model and the convention modules the vault loads (`archive.md`; `source-collections.md` if present) — read them; this skill sets the order and the checks. Folder names below are the `data.json` keys, never assumed paths.
 
-**Rules.** The core model is `<vault-verify>/references/charted-roots-model.md`; the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<vault-verify>` is the `vault-verify` skill folder — `../vault-verify` from this skill's base directory. Run scripts from the vault root.
+**Rules.** The core model is `<vault-verify>/references/charted-roots-model.md` (already in context when the plugin's session-start hook ran); the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<vault-verify>` is `${CLAUDE_SKILL_DIR}/../vault-verify`. Run scripts from the vault root.
 
 ## Inputs
 

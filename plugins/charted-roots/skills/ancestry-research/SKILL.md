@@ -13,7 +13,7 @@ Adapted (MIT, see `LICENSE`) from `DenisSergeevitch/ex-ussr-kinship-research`. L
 
 ## Rules that win
 
-The core model (`<vault-verify>/references/charted-roots-model.md`, where `<vault-verify>` is `../vault-verify` from this skill's base directory), the vault's `CLAUDE.md` and its `.claude/conventions/*` override anything in this skill or its references. In particular:
+The core model (`<vault-verify>/references/charted-roots-model.md`, where `<vault-verify>` is `${CLAUDE_SKILL_DIR}/../vault-verify`), the vault's `CLAUDE.md` and its `.claude/conventions/*` override anything in this skill or its references. In particular:
 
 - **Language** — the vault's working language (its `CLAUDE.md`; English if unstated) for prose, headings, labels. Quoted record text, archival designations and native-script names stay verbatim, with a translation beside them. Search queries are written in the *source's* language.
 - **Privacy** — the vault holds living people. **No web search, portal lookup, upload or e-mail without the user's explicit instruction for this task.** Reading local scans and notes needs none.

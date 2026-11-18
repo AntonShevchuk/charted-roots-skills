@@ -1,6 +1,6 @@
 # Charted Roots vault model
 
-The shared rule set for an Obsidian vault managed by the **Charted Roots** plugin. Every skill in this plugin reads it. A vault's own `CLAUDE.md` and `.claude/conventions/*.md` override it where they differ.
+The shared rule set for an Obsidian vault managed by the **Charted Roots** plugin. The plugin's session-start hook loads it into every session in a vault, and every skill relies on it. A vault's own `CLAUDE.md` and `.claude/conventions/*.md` override it where they differ.
 
 ## What this is
 

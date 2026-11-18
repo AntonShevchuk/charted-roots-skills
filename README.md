@@ -8,25 +8,32 @@ Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault manage
 | `ancestry-research` | Plan and run a kinship investigation; regional guides (former USSR, Russian Empire, Galicia/Bukovina, Bessarabia); draft archive requests |
 | `vault-verify` | Read-only consistency audit. Its `scripts/` (`crsync`, standard-library Python) is the toolkit the other skills call |
 | `gedcom-sync` | Reconcile an upstream GEDCOM export without the duplicates the plugin's import wizard creates |
+| `init-vault` | One-time vault setup: `CLAUDE.md`, convention modules, project-scope plugin settings (run it as `/charted-roots:init-vault`) |
 
 ## Install
 
+Install per vault (project scope), so the plugin is active only where it is needed. In the vault folder:
+
 ```
-/plugin marketplace add AntonShevchuk/charted-roots-skills
-/plugin install charted-roots@charted-roots-skills
+claude plugin marketplace add AntonShevchuk/charted-roots-skills
+claude plugin install charted-roots@charted-roots-skills --scope project
 ```
 
-Or copy `plugins/charted-roots/skills/*` into your vault's `.claude/skills/`. The skills locate each other as sibling folders, so both layouts work.
+Then start Claude Code in the vault and run `/charted-roots:init-vault`. It:
+
+- writes the vault's `CLAUDE.md` from `templates/CLAUDE.md` (or merges into an existing one, showing the diff);
+- suggests convention modules from what the vault already contains and copies the ones you pick into `.claude/conventions/`;
+- adds the marketplace and `enabledPlugins` entry to the vault's `.claude/settings.json`, so collaborators who clone the vault are pointed at the plugin. Each of them runs the `claude plugin install … --scope project` line once.
+
+Nothing is written before you approve the plan.
 
 Requires Python 3.10+ for the scripts. Pillow is optional (`scan_montage.py` only).
 
-## Set up your vault
+## How the rules load
 
-The skills read every folder and setting from `.obsidian/plugins/charted-roots/data.json`; nothing is assumed.
-
-- **Core rules** — `skills/vault-verify/references/charted-roots-model.md`: entity model, invariants, evidence chain, vocabularies, places, GEDCOM, date forms. Every skill reads it.
-- **Your `CLAUDE.md`** — start from `templates/CLAUDE.md`. It overrides the core rules where they differ, sets the working language, and imports the optional modules. To have the core rules in sessions where no skill runs, copy the model file to `.claude/conventions/` as the template describes.
-- **Optional modules** — `templates/conventions/`. Copy the ones you use into `.claude/conventions/`; each skill degrades when one is absent.
+- **Core rules** — `skills/vault-verify/references/charted-roots-model.md`: entity model, invariants, evidence chain, vocabularies, places, GEDCOM, date forms. A session-start hook loads it into every session started in a Charted Roots vault (detected by `.obsidian/plugins/charted-roots/data.json`) and outputs nothing elsewhere. It stays current with plugin updates; nothing is copied into the vault.
+- **Your `CLAUDE.md`** — house rules: working language, git habits, module imports. It overrides the core rules where they differ.
+- **Convention modules** — `.claude/conventions/*.md`, copied from `templates/conventions/`; each skill degrades when one is absent.
 
 | Module | Adds |
 |---|---|

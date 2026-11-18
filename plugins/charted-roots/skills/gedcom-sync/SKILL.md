@@ -8,7 +8,7 @@ description: Use when a new GEDCOM export of the upstream tree has arrived, or w
 Never use the Charted Roots import wizard for a re-import: it never reads `external_id` / `gedcom_id` back and adds a second note per record. This skill runs the reconciler that does the join. It applies only where the vault's `CLAUDE.md` names an upstream master (core model § GEDCOM); a vault that is its own master has nothing to sync.
 
 - **Flags, exit codes, join keys, design notes:** `<vault-verify>/scripts/README.md`.
-- **Rules.** The core model is `<vault-verify>/references/charted-roots-model.md`; the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<vault-verify>` is the `vault-verify` skill folder — `../vault-verify` from this skill's base directory. Run scripts from the vault root.
+- **Rules.** The core model is `<vault-verify>/references/charted-roots-model.md` (already in context when the plugin's session-start hook ran); the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<vault-verify>` is `${CLAUDE_SKILL_DIR}/../vault-verify`. Run scripts from the vault root.
 - **The export:** `--ged <file>` (default `FamilyTree.ged` at the vault root). Read names per the vault's upstream-tree convention, if any.
 - **Accepted rulings:** `History/gedcom-sync-decisions.json` — the script reads it from that path; a missing file accepts nothing. Created on the first ruling.
 - **With `history.md`:** the method note `History/GEDCOM Reconciliation.md` (if present) and its run record `History/GEDCOM Reconciliation - Report.md` — read the latest entry before judging a finding new.

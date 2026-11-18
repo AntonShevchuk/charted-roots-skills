@@ -4,9 +4,7 @@ An Obsidian vault of genealogy notes managed by the **Charted Roots** plugin, wo
 
 ## Core rules
 
-The entity model, invariants, evidence chain, vocabularies, place and GEDCOM rules ship with the plugin in `skills/vault-verify/references/charted-roots-model.md`; every skill reads it. To apply them in sessions where no skill runs, copy that file to `.claude/conventions/charted-roots-model.md` and keep the import below (re-copy after a plugin update). This file and the modules override it where they differ.
-
-@.claude/conventions/charted-roots-model.md
+The entity model, invariants, evidence chain, vocabularies, place and GEDCOM rules ship with the plugin (`skills/vault-verify/references/charted-roots-model.md`); its session-start hook loads them into every session in this vault. This file and the modules below override them where they differ.
 
 ## Language
 
@@ -15,7 +13,7 @@ English is the working language for headings, labels, analysis, research prose a
 
 ## House conventions (opt-in modules)
 
-Copy the modules you use from the plugin's `templates/conventions/` into `.claude/conventions/`; delete the lines for the others.
+`/charted-roots:init-vault` copies the chosen modules into `.claude/conventions/` and keeps only their lines here.
 
 @.claude/conventions/source-collections.md
 @.claude/conventions/archive.md
