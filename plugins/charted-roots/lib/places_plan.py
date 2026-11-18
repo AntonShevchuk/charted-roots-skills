@@ -137,7 +137,14 @@ def cmd_apply(cfg: config.Config, args: argparse.Namespace) -> int:
 
     before = verify.run(cfg)
     log.baseline(before)
-    _print_result(placeplan.apply_plan(plan, cfg, dry=False), dry=False)
+    try:
+        result = placeplan.apply_plan(plan, cfg, dry=False)
+    except OSError as exc:
+        print(f"Write failed: {exc}. Some Place notes may be written; "
+              f"restore from the {TAG_PREFIX}-* tag and re-run.",
+              file=sys.stderr)
+        return 1
+    _print_result(result, dry=False)
     after = verify.run(cfg)
     log.invariants(after)
     regressed = verify.regressions(before, after)

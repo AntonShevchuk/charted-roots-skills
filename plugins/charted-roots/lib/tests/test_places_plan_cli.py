@@ -8,7 +8,7 @@ import os
 import subprocess
 
 import places_plan
-from crsync import placeplan
+from crsync import placeplan, vault
 
 from .helpers import FOLDERS, VaultCase
 from .test_placeplan import _chain
@@ -119,6 +119,24 @@ class Apply(CliCase):
             "Lower Silesian Voivodeship.md", "Poland.md", "Wrocław.md"])
         self.assertEqual(placeplan.load(self.root).places["poland"].status,
                          "created")
+
+    def test_a_write_failure_names_the_restore_tag_and_exits_1(self):
+        self.save_plan()
+        real = vault.write_atomic
+
+        def boom(path, text):
+            raise OSError(28, "No space left on device")
+        vault.write_atomic = boom
+        try:
+            code, out, err = self.run_cli(
+                "apply", "--apply", "--allow-obsidian-open",
+                "--no-restore-point")
+        finally:
+            vault.write_atomic = real
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("No space left", err)
+        self.assertIn("pre-organize-places-", err)
+        self.assertEqual(len(err.strip().splitlines()), 1, err)
 
     def test_override_flags_need_apply(self):
         self.save_plan()

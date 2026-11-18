@@ -70,8 +70,9 @@ write a place that does not resolve to a Place note.
 A historical PLAC (`Breslau, Schlesien, ...`) links through Place aliases only
 when `History/places-plan.json` approves that exact string (see
 `/charted-roots:organize-places`), so it resolves PLACs the plugin's wizard
-would not; an unreadable plan turns alias matching off for the run and prints
-a warning. An empty Person `birth_place:` /
+would not, and only on the Place the plan approves it for (a Place added later
+that would outscore it gives no link); an unreadable plan turns alias matching
+off for the run and prints a warning. An empty Person `birth_place:` /
 `death_place:` / `burial_place:` is filled with a `[[Place]]` link once the
 PLAC resolves.
 
@@ -123,7 +124,8 @@ key, or `not_place`, or `unidentified`; `status` `proposed` / `approved`).
 
 `extract` adds only strings not yet in the plan and refreshes counts; it never
 drops a reviewed entry. `check` fails on a missing parent, a cycle, an invalid
-`place_type`, a duplicate title under one parent, a Place that already exists,
+`place_type`, a duplicate title under one parent (the last two skip entries recorded
+from notes already in the vault), a Place that already exists,
 or an approved PLAC that would not resolve to its own planned Place. `apply`
 refuses a plan that fails `check`; with `--apply` it writes approved places
 only, parents first, adds missing `aliases:` to an existing Place (nothing else

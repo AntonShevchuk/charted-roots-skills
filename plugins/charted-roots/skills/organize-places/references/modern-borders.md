@@ -21,7 +21,7 @@ A Place sits where the town is **today**. The chain is the modern country, its f
 ## Titles and aliases
 
 - **Title**: the English form, per the vault's Language section (`Wrocław`, `Lower Silesian Voivodeship`, `Copenhagen`).
-- **Aliases**: the export's form of a name and its native and historical forms (`Breslau`), each on the Place it names. Put `Schlesien` on the voivodeship it falls in, not on the city.
+- **Aliases**: the export's form of a name and its native and historical forms (`Breslau`), each on the Place it names. Put a historical region name (`Schlesien`) as an alias only on a modern division it substantially coincides with, never on the city. A region that splits across several divisions or countries goes on none of them: rely on the leaf (`Breslau` on the city) and let `check` confirm the string resolves, adding a disambiguating alias on the leaf if it does not.
 - A string must resolve to exactly one Place, and `check` fails when it lands anywhere but its planned Place. Add the alias that disambiguates (a district or county form) rather than dropping one.
 - Keep native-script spellings verbatim.
 
