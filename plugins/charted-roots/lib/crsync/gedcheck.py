@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from . import dates as gedcom_dates
 from . import gedcom
 from . import places
 
@@ -201,8 +202,98 @@ def _marriages(tree, host):
                       f"only on the person: {why}", fix)
 
 
+def _all_events(tree):
+    """(who, event) for every INDI and FAM event, suppressed EVENs included."""
+    for ind in tree.individuals.values():
+        who = _person(tree, ind.xref)
+        for ev in ind.events:
+            yield who, ev
+    for fam in tree.families.values():
+        who = _family(tree, fam.xref)
+        for ev in fam.events:
+            yield who, ev
+    for _, ev in tree.suppressed:
+        yield _person(tree, ev.owner), ev
+
+
+_REWRITE = "rewrite as D MMM YYYY (or ABT / BEF / AFT / BET ... AND ...)"
+
+
+def _date_forms(tree, host):
+    for who, ev in _all_events(tree):
+        label, suggestion = gedcom_dates.classify(ev.date_raw)
+        raw, tag = ev.date_raw.strip(), _label(ev)
+        if label == "unreadable":
+            yield Finding("date-unreadable", "dates", "fix", who, ev.line,
+                          f"{tag} date \"{raw}\" cannot be read",
+                          f"in {host}: {_REWRITE}")
+        elif label == "invalid":
+            yield Finding("date-invalid", "dates", "fix", who, ev.line,
+                          f"{tag} date \"{raw}\" is not a real calendar day",
+                          f"in {host}: correct the date, then {_REWRITE}")
+        elif label == "lenient":
+            yield Finding("date-nonstandard", "dates", "fix", who, ev.line,
+                          f"{tag} date \"{raw}\" is not standard GEDCOM",
+                          f"in {host}: write \"{raw}\" as \"{suggestion}\"")
+
+
+def _first(ind, *tags):
+    return next((e for e in ind.events if e.tag in tags), None)
+
+
+def _date_order(tree, host):
+    def order(who, line, what, later_hi, earlier_lo):
+        if later_hi and earlier_lo and later_hi < earlier_lo:
+            return Finding("date-order", "dates", "review", who, line, what,
+                           f"in {host}: check both dates against the sources")
+
+    for ind in tree.individuals.values():
+        who = _person(tree, ind.xref)
+        birt, deat = _first(ind, "BIRT"), _first(ind, "DEAT")
+        buri = _first(ind, "BURI", "CREM")
+        b = gedcom_dates.bounds(birt.date_raw) if birt else (None, None)
+        d = gedcom_dates.bounds(deat.date_raw) if deat else (None, None)
+        u = gedcom_dates.bounds(buri.date_raw) if buri else (None, None)
+        found = []
+        if birt and deat:
+            found.append(order(
+                who, deat.line, f"death ({deat.date_raw}) is before birth "
+                f"({birt.date_raw})", d[1], b[0]))
+            if d[0] and b[1] and int(d[0][:4]) - int(b[1][:4]) > 120:
+                found.append(Finding(
+                    "date-order", "dates", "review", who, deat.line,
+                    f"lifespan over 120 years (born {birt.date_raw}, died "
+                    f"{deat.date_raw})",
+                    f"in {host}: check both dates against the sources"))
+        if buri and deat:
+            found.append(order(
+                who, buri.line, f"{'cremation' if buri.tag == 'CREM' else 'burial'}"
+                f" ({buri.date_raw}) is before death ({deat.date_raw})",
+                u[1], d[0]))
+        for famc in ind.famc:
+            fam = tree.families.get(famc)
+            if fam is None or not birt:
+                continue
+            for tag, parent in (("HUSB", fam.husband), ("WIFE", fam.wife)):
+                p = tree.individuals.get(parent) if parent else None
+                pb = _first(p, "BIRT") if p else None
+                if pb is None or fam.relation(ind.xref, tag) != "birth":
+                    continue
+                found.append(order(
+                    who, birt.line, f"born ({birt.date_raw}) before their "
+                    f"parent {p.name or '(unnamed)'} (@{p.xref}@, born "
+                    f"{pb.date_raw})", b[1], gedcom_dates.bounds(pb.date_raw)[0]))
+        yield from (f for f in found if f)
+
+
+def _dates(tree, host):
+    yield from _date_forms(tree, host)
+    yield from _date_order(tree, host)
+
+
 #: Adding a check group is one entry here.
-_RUNNERS = {"duplicates": _duplicates, "marriages": _marriages}
+_RUNNERS = {"duplicates": _duplicates, "marriages": _marriages,
+            "dates": _dates}
 
 
 def run(tree, only: set | None = None) -> list:

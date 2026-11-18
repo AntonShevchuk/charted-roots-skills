@@ -148,6 +148,68 @@ class Marriages(unittest.TestCase):
         self.assertIn("add the spouse", loose.fix)
 
 
+DATES = indi("1 BIRT", "2 DATE 25 Foo 1914",
+             "1 DEAT", "2 DATE 31 FEB 1850",
+             "1 BAPM", "2 DATE 25 Dez 1914",
+             "1 RESI", "2 DATE FROM 1850")
+
+
+def life(birth, death, burial=None):
+    lines = ["1 BIRT", f"2 DATE {birth}", "1 DEAT", f"2 DATE {death}"]
+    if burial:
+        lines += ["1 BURI", f"2 DATE {burial}"]
+    return indi(*lines)
+
+
+def parent_child(child_birth, parent_birth, frel=None):
+    chil = "1 CHIL @I3@\n" + (f"2 _FREL {frel}\n" if frel else "")
+    return ("0 @I1@ INDI\n1 NAME Karl /Beispiel/\n1 FAMS @F1@\n"
+            f"1 BIRT\n2 DATE {parent_birth}\n"
+            "0 @I2@ INDI\n1 NAME Anna /Muster/\n1 FAMS @F1@\n"
+            "0 @I3@ INDI\n1 NAME Kind /Beispiel/\n1 FAMC @F1@\n"
+            f"1 BIRT\n2 DATE {child_birth}\n"
+            "0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n" + chil + "0 TRLR\n")
+
+
+class Dates(unittest.TestCase):
+    def test_each_label_maps_to_its_check(self):
+        fs = check(DATES)
+        self.assertEqual(sorted(f.check for f in fs),
+                         ["date-invalid", "date-nonstandard", "date-unreadable"])
+        self.assertIn('"25 DEC 1914"', only(fs, "date-nonstandard").fix)
+        self.assertTrue(only(fs, "date-unreadable").fix.startswith("in Ancestry: "))
+
+    def test_suppressed_even_dates_are_checked(self):
+        f = only(check(indi("1 EVEN", "2 TYPE Obituary", "2 DATE 25 Dez 1914")),
+                 "date-nonstandard")
+        self.assertIn('"25 DEC 1914"', f.fix)
+
+    def test_death_before_birth(self):
+        f = only(check(life("1 JUN 1850", "1 JUN 1840")), "date-order")
+        self.assertEqual(f.kind, "review")
+        self.assertIn("death", f.what)
+
+    def test_burial_before_death(self):
+        f = only(check(life("1 JUN 1800", "1 JUN 1850", "1 JUN 1840")),
+                 "date-order")
+        self.assertIn("burial", f.what)
+
+    def test_child_born_before_parent(self):
+        f = only(check(parent_child("1 JUN 1840", "1 JUN 1850")), "date-order")
+        self.assertEqual(f.who, "Kind Beispiel (@I3@)")
+
+    def test_step_child_older_than_step_parent_is_fine(self):
+        self.assertEqual(
+            check(parent_child("1 JUN 1840", "1 JUN 1850", frel="Step")), [])
+
+    def test_lifespan_over_120(self):
+        f = only(check(life("1 JUN 1700", "1 JUN 1830")), "date-order")
+        self.assertIn("lifespan", f.what)
+
+    def test_about_dates_do_not_false_positive(self):
+        self.assertEqual(check(life("ABT 1850", "1845")), [])
+
+
 class Run(unittest.TestCase):
     def test_only_filters_by_group(self):
         text = TWO_SAME_BIRTHS
