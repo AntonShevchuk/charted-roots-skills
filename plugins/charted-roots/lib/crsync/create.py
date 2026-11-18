@@ -372,12 +372,20 @@ def build_source(src, cfg, taken_ids, used_paths, registered) -> NewNote:
 #: How an event_type renders in a title.
 _TITLE = {
     "birth": "Birth", "death": "Death", "marriage": "Marriage", "divorce": "Divorce",
-    "burial": "Burial", "baptism": "Baptism", "residence": "Residence",
+    "burial": "Burial", "baptism": "Baptism", "christening": "Christening",
+    "residence": "Residence",
     "occupation": "Occupation", "naturalization": "Naturalization",
     "probate": "Probate", "graduation": "Graduation", "emigration": "Emigration",
     "immigration": "Immigration", "census": "Census", "will": "Will",
     "military": "Military service",
 }
+
+
+def event_label(event_type: str) -> str:
+    """How an event_type reads in a title; else the plugin's formatEventType
+    (`first_communion` -> `First Communion`)."""
+    return _TITLE.get(event_type) or " ".join(
+        w.capitalize() for w in event_type.split("_"))
 
 
 def build_event(ev, tree, cfg, place_index, taken_ids, used_paths,
@@ -386,7 +394,7 @@ def build_event(ev, tree, cfg, place_index, taken_ids, used_paths,
     participants = [p for p in participants if p]
     if not participants:
         return None
-    label = _TITLE.get(ev.event_type, ev.event_type.capitalize())
+    label = event_label(ev.event_type)
     if len(participants) == 2:
         title = f"{label} of {participants[0]} and {participants[1]}"
     else:

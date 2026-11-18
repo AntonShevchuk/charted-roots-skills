@@ -162,6 +162,17 @@ EVEN_ALIASES = """0 HEAD
 1 EVEN
 2 TYPE Verlobung
 2 DATE 1 JAN 1898
+1 EVEN
+2 TYPE Konfirmation
+2 DATE 2 APR 1885
+1 EVEN
+2 TYPE Military Service
+2 DATE 1916
+1 EVEN
+2 TYPE Reference Number
+2 DATE 1 JAN 1900
+1 CHR
+2 DATE 12 MAR 1871
 0 @I2@ INDI
 1 NAME Anna /Beispiel/
 1 FAMS @F1@
@@ -191,7 +202,9 @@ class EvenAliases(unittest.TestCase):
     def test_the_labels_classify_as_standard_facts(self):
         for raw, want in [("MARR", "marriage"), ("marr", "marriage"),
                           ("Hochzeit", "marriage"), ("Taufe", "baptism"),
-                          ("Taufe ", "baptism")]:
+                          ("Taufe ", "baptism"), ("Konfirmation", "confirmation"),
+                          ("Verlobung", "engagement"),
+                          ("Military Service", "military")]:
             with self.subTest(raw):
                 self.assertEqual(gedcom.classify_even(raw), (want, "standard"))
 
@@ -215,9 +228,53 @@ class EvenAliases(unittest.TestCase):
         self.assertEqual(ev.citations, [("S1", "Heiratsregister Nr. 21")])
         self.assertEqual(ev.even_type, "MARR")
 
+    def test_a_marriage_only_on_the_person_is_recorded_for_an_upstream_fix(self):
+        # 1 JUN 1920 matches no family marriage, so it stays a person-level
+        # Event -- and the report asks for it to be moved upstream.
+        loose = [(e.date, why) for e, why in self.tree.person_marriages]
+        self.assertEqual(loose, [("1920-06-01", "no family marriage on this date")])
+
     def test_other_labels_are_still_set_aside(self):
         self.assertEqual([(d, e.even_type) for d, e in self.tree.suppressed],
-                         [("unknown", "Verlobung")])
+                         [("unknown", "Reference Number")])
+
+    def test_labelled_facts_take_the_plugins_event_types(self):
+        types = {e.even_type: (e.tag, e.event_type)
+                 for e in self.tree.individuals["I1"].events if e.even_type}
+        self.assertEqual(types["Konfirmation"], ("CONF", "confirmation"))
+        self.assertEqual(types["Verlobung"], ("ENGA", "engagement"))
+        self.assertEqual(types["Military Service"], ("MILI", "military"))
+
+    def test_chr_is_a_christening_as_the_plugin_imports_it(self):
+        chr_ = [e for e in self.tree.individuals["I1"].events if e.tag == "CHR"]
+        self.assertEqual([e.event_type for e in chr_], ["christening"])
+
+
+class TagTable(unittest.TestCase):
+
+    def test_event_titles_read_like_the_plugins(self):
+        from crsync import create
+        self.assertEqual(create.event_label("christening"), "Christening")
+        self.assertEqual(create.event_label("first_communion"), "First Communion")
+        self.assertEqual(create.event_label("military"), "Military service")
+
+    def test_the_tag_table_is_the_plugins(self):
+        # Charted Roots 0.22.76 `Yoe`, plus Ancestry's `_MILT`.
+        plugin = {
+            "BIRT": "birth", "DEAT": "death", "MARR": "marriage", "DIV": "divorce",
+            "BURI": "burial", "CREM": "cremation", "ADOP": "adoption",
+            "GRAD": "graduation", "RETI": "retirement", "CENS": "census",
+            "RESI": "residence", "OCCU": "occupation", "EDUC": "education",
+            "PROB": "probate", "WILL": "will", "NATU": "naturalization",
+            "MILI": "military", "IMMI": "immigration", "EMIG": "emigration",
+            "BAPM": "baptism", "CHR": "christening", "CHRA": "adult_christening",
+            "CONF": "confirmation", "FCOM": "first_communion",
+            "ORDN": "ordination", "BARM": "bar_mitzvah", "BASM": "bas_mitzvah",
+            "BLES": "blessing", "ENGA": "engagement", "MARB": "marriage_bann",
+            "MARC": "marriage_contract", "MARL": "marriage_license",
+            "MARS": "marriage_settlement", "ANUL": "annulment",
+            "DIVF": "divorce_filed"}
+        self.assertEqual(gedcom.TAG_TO_EVENT, {**plugin, "_MILT": "military"})
 
 
 class Parse(unittest.TestCase):

@@ -679,5 +679,66 @@ class Inputs(CliCase):
         self.assertIn("GEDCOM unreadable", err)
 
 
+
+
+PERSON_MARRIAGES = """0 HEAD
+1 SOUR MYHERITAGE
+1 GEDC
+2 VERS 5.5.1
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Jürgen /Muster/
+1 FAMS @F1@
+1 MARR
+2 DATE 27 MAY 1849
+2 PLAC Musterdorf
+0 @I2@ INDI
+1 NAME Anna /Meyer/
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME Karl /Beispiel/
+1 EVEN
+2 TYPE MARR
+2 DATE 1 JUN 1880
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 MARR
+2 DATE 27 MAY 1849
+0 TRLR
+"""
+
+
+class PersonMarriages(CliCase):
+    """A marriage written on a person, not the family: fix it upstream."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("FamilyTree.ged", PERSON_MARRIAGES)
+
+    def test_the_report_lists_both_kinds_with_the_fix_in_the_host(self):
+        code, out, _ = self.run_cli()
+        self.assertEqual(code, 0, out)
+        section = out[out.index("FIX UPSTREAM"):]
+        self.assertIn("in MyHeritage", section)
+        self.assertIn("Jürgen Muster (@I1@)", section)
+        self.assertIn("Karl Beispiel (@I3@)", section)
+        # The duplicate: the family already holds it.
+        dup = next(l for l in section.splitlines() if "@I1@" in l)
+        self.assertIn("1849-05-27", dup)
+        line = section[section.index("@I1@"):].split("\n\n")[0]
+        self.assertIn("delete the person-level marriage", line)
+        self.assertIn("Anna Meyer (@I2@)", line)
+        # Person-only, no family: add the spouse.
+        loose = section[section.index("@I3@"):].split("\n\n")[0]
+        self.assertIn("1880-06-01", loose)
+        self.assertIn("no family", loose)
+        self.assertIn("add the spouse", loose)
+
+    def test_a_clean_tree_has_no_such_section(self):
+        self.write("FamilyTree.ged", GED)
+        _, out, _ = self.run_cli()
+        self.assertNotIn("FIX UPSTREAM", out)
+
 if __name__ == "__main__":
     unittest.main()

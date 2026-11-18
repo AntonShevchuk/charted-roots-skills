@@ -214,8 +214,22 @@ Parsing targets Ancestry 5.5.1 exports; two MyHeritage habits are handled too.
 A UTF-8 character cut at a `CONC` boundary is rejoined in memory (the file is
 never rewritten), including after a bare text line, which MyHeritage writes
 instead of `CONT`; the run warns with the line numbers. A `1 EVEN` whose
-`2 TYPE` is `MARR` or `Hochzeit` is read as a marriage and `Taufe` as a
-baptism, so an individual marriage folds into the family marriage it repeats.
+`2 TYPE` is `MARR` or `Hochzeit` is read as a marriage, `Taufe` as a baptism,
+`Konfirmation` as a confirmation, `Verlobung` as an engagement and `Military
+Service` as military, so an individual marriage folds into the family marriage
+it repeats. Other labels are set aside and listed in the report.
+
+A marriage written on a person rather than the family is listed in the
+report's section 8, FIX UPSTREAM, with the host the header names and the fix to
+make there: a duplicate of the family marriage is deleted from the person; one
+only on the person moves onto the family with that spouse (or the spouse is
+added first). The plugin's own import drops both; the sync keeps the
+person-only one as a person-level Event until the host is fixed.
+
+GEDCOM tags map to `event_type` exactly as the Charted Roots importer maps them
+(`crsync/gedcom.py` `TAG_TO_EVENT`, pinned by a test): `CHR` is `christening`,
+`BAPM` is `baptism`, `CONF` is `confirmation`, `ENGA` is `engagement`, and so on.
+`_MILT` (Ancestry's military fact, which the importer drops) is `military`.
 Bare text lines themselves are still skipped and counted in a warning.
 
 ## Layout

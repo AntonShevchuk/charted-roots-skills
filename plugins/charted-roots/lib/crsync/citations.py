@@ -35,7 +35,7 @@ def normalise_page(value: str) -> str:
 #: eventTypeToFact, restricted to the facts in the vault model's `fact` list.
 FACT = {
     "birth": "birth_date", "death": "death_date", "marriage": "marriage_date",
-    "baptism": "baptism_date", "burial": "burial_date", "residence": "residence",
+    "baptism": "baptism_date", "christening": "baptism_date", "burial": "burial_date", "residence": "residence",
     "occupation": "occupation", "probate": "probate", "graduation": "graduation",
     "naturalization": "naturalization", "emigration": "emigration",
     "immigration": "emigration", "military": "occupation", "divorce": "marriage_date",

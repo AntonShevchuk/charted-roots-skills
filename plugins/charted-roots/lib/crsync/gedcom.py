@@ -30,14 +30,24 @@ _BYTE_LINE = re.compile(rb"^[ \t]*([0-9]+)\s+(?:@[^@]+@\s+)?(\S+)(?:\s(.*))?$")
 #: How many line numbers a warning lists before summarising the rest.
 _WARN_LINES = 20
 
-#: GEDCOM tag -> the vault's `event_type`. CHR (christening) and BAPM both map
-#: to baptism, which is what the existing Events use.
+#: GEDCOM tag -> the vault's `event_type`, exactly as the Charted Roots
+#: importer maps them (its `Yoe` table, plugin 0.22.76), so a note the sync
+#: creates carries the type the plugin's own import would give it. `_MILT`
+#: is extra: Ancestry's military fact, which the plugin's importer drops.
 TAG_TO_EVENT = {
     "BIRT": "birth", "DEAT": "death", "MARR": "marriage", "DIV": "divorce",
-    "BURI": "burial", "BAPM": "baptism", "CHR": "baptism", "RESI": "residence",
-    "OCCU": "occupation", "NATU": "naturalization", "PROB": "probate",
-    "GRAD": "graduation", "EMIG": "emigration", "IMMI": "immigration",
-    "CENS": "census", "WILL": "will", "_MILT": "military",
+    "BURI": "burial", "CREM": "cremation", "ADOP": "adoption",
+    "GRAD": "graduation", "RETI": "retirement", "CENS": "census",
+    "RESI": "residence", "OCCU": "occupation", "EDUC": "education",
+    "PROB": "probate", "WILL": "will", "NATU": "naturalization",
+    "MILI": "military", "IMMI": "immigration", "EMIG": "emigration",
+    "BAPM": "baptism", "CHR": "christening", "CHRA": "adult_christening",
+    "CONF": "confirmation", "FCOM": "first_communion", "ORDN": "ordination",
+    "BARM": "bar_mitzvah", "BASM": "bas_mitzvah", "BLES": "blessing",
+    "ENGA": "engagement", "MARB": "marriage_bann", "MARC": "marriage_contract",
+    "MARL": "marriage_license", "MARS": "marriage_settlement",
+    "ANUL": "annulment", "DIVF": "divorce_filed",
+    "_MILT": "military",
 }
 
 #: `2 TYPE` prefixes under a `1 EVEN` block. Travel becomes a real Event.
@@ -46,9 +56,11 @@ TAG_TO_EVENT = {
 EVEN_TRAVEL = {"arrival": "immigration", "departure": "emigration"}
 #: `2 TYPE` labels that are a standard fact written as EVEN. MyHeritage
 #: exports some marriages as `1 EVEN` / `2 TYPE MARR`, and German-language
-#: trees label baptisms and weddings. They are read as that tag, so an
+#: trees label baptisms, weddings, confirmations and engagements. They are read as that tag, so an
 #: individual marriage folds into the FAM marriage it repeats.
-EVEN_STANDARD = {"marr": "MARR", "hochzeit": "MARR", "taufe": "BAPM"}
+EVEN_STANDARD = {"marr": "MARR", "hochzeit": "MARR", "taufe": "BAPM",
+                 "konfirmation": "CONF", "verlobung": "ENGA",
+                 "military service": "MILI"}
 EVEN_DERIVATIVE_PREFIXES = ("obituary", "testament", "marriage license")
 #: A shared event yields one EVEN block per individual, so these must collapse
 #: to the single FAM-level Event rather than being counted per person.
@@ -418,6 +430,9 @@ class Tree:
     suppressed: list = field(default_factory=list)
     #: (individual MARR, FAM MARR) pairs folded into one event
     folded: list = field(default_factory=list)
+    #: (individual MARR, reason) for a marriage only on the person: it stays
+    #: a person-level Event here, and the plugin's own import drops it
+    person_marriages: list = field(default_factory=list)
     #: Problems met while reading: skipped lines, recovered characters
     warnings: list = field(default_factory=list)
 
@@ -566,6 +581,16 @@ def _fold_marriages(tree: Tree) -> None:
                        for fe in tree.families[f].events
                        if fe.tag == "MARR" and _same_date(ev.date, fe.date)]
             if len(targets) != 1:
+                fams = [f for f in ind.fams if f in tree.families]
+                if not fams:
+                    why = "no family"
+                elif not ev.date:
+                    why = "undated"
+                elif not targets:
+                    why = "no family marriage on this date"
+                else:
+                    why = "several family marriages on this date"
+                tree.person_marriages.append((ev, why))
                 continue
             ev.folded = True
             if not targets[0].place:

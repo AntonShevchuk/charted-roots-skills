@@ -76,6 +76,80 @@ def _histogram(counter, indent="      ") -> list:
     return out
 
 
+def host_name(tree) -> str:
+    """The service the export came from, for "fix it in ..." lines."""
+    source = (tree.header.get("source") or "").strip()
+    low = source.lower()
+    if "myheritage" in low:
+        return "MyHeritage"
+    if "ancestry" in low:
+        return "Ancestry"
+    if "familysearch" in low:
+        return "FamilySearch"
+    return source or "the tree's host"
+
+
+def _person(tree, xref: str) -> str:
+    ind = tree.individuals.get(xref)
+    return f"{ind.name or '(unnamed)'} (@{xref}@)" if ind else f"@{xref}@"
+
+
+def _spouses(tree, xref: str) -> list:
+    """(family xref, the other partner) for each family the person heads."""
+    ind = tree.individuals.get(xref)
+    out = []
+    for f in (ind.fams if ind else []):
+        fam = tree.families.get(f)
+        if fam is None:
+            continue
+        other = fam.wife if fam.husband == xref else fam.husband
+        out.append((f, _person(tree, other) if other else "no partner"))
+    return out
+
+
+def upstream_marriage_fixes(tree) -> list:
+    """Marriages written on a person rather than the family, with the fix.
+
+    Each entry is (person, date, place, what it is, what to do upstream).
+    A duplicate of the family marriage folds here, and one only on the
+    person stays a person-level Event; the plugin's own import drops both.
+    Either way the export is cleaner once the host holds the marriage on
+    the family, so the report says where and how.
+    """
+    host = host_name(tree)
+    out = []
+    for ind_ev, fam_ev in tree.folded:
+        partner = dict(_spouses(tree, ind_ev.owner)).get(fam_ev.owner, "")
+        what = f"duplicate of the family marriage @{fam_ev.owner}@" + \
+            (f" with {partner}" if partner else "")
+        fix = (f"fix in {host}: delete the person-level marriage; the family "
+               f"already holds it")
+        if ind_ev.place and fam_ev.place == ind_ev.place:
+            fix += (f" (make sure the family keeps the place "
+                    f"\"{ind_ev.place}\")")
+        elif ind_ev.place:
+            fix += (f" (the places differ: person \"{ind_ev.place}\", "
+                    f"family \"{fam_ev.place}\" -- keep the right one)")
+        out.append((_person(tree, ind_ev.owner), ind_ev.date, ind_ev.place,
+                    what, fix))
+    for ev, why in tree.person_marriages:
+        spouses = _spouses(tree, ev.owner)
+        names = ", ".join(p for _, p in spouses)
+        if why == "no family":
+            fix = (f"fix in {host}: add the spouse, and record the marriage on "
+                   f"that family instead of on the person")
+        elif len(spouses) == 1:
+            fix = (f"fix in {host}: move the marriage onto the family with "
+                   f"{names}" + ("; date it" if why == "undated" else
+                                 ", or correct the date if it is the same marriage"))
+        else:
+            fix = (f"fix in {host}: move the marriage onto the right family "
+                   f"({names})" + ("; date it" if why == "undated" else ""))
+        out.append((_person(tree, ev.owner), ev.date, ev.place,
+                    f"only on the person: {why}", fix))
+    return out
+
+
 def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
            citation_match, place_index, obsidian_running, limit=10,
            decisions=None, creation=None, only=None, blocked=None,
@@ -344,6 +418,21 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
                 a(f"        ... and {len(group) - limit} more")
             L.extend(_frontmatter_lines(group[0], "          "))
         a("")
+
+    fixes = upstream_marriage_fixes(tree) if want("event") else []
+    if fixes:
+        a(f"-- 8. FIX UPSTREAM (in {host_name(tree)}) " + "-" * max(
+            4, 56 - len(host_name(tree))))
+        a(f"  {len(fixes)} marriages written on a person, not on the family.")
+        a("  The plugin's own import drops them; the sync keeps them, but the")
+        a("  export stays wrong until the host records them on the family.")
+        a("")
+        for person, date, place, what, fix in fixes:
+            a(f"  {person}  marriage {date or '(undated)'}"
+              + (f"  {place}" if place else ""))
+            a(f"      {what}")
+            a(f"      {fix}")
+            a("")
 
     if blocked:
         a("-- WOULD REFUSE " + "-" * 62)
