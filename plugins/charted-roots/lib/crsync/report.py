@@ -351,7 +351,9 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
     fixes = []
     if want("event"):
         at = {e.line: e for e in tree.events}
-        for f in gedcheck.run(tree, {"marriages"}):
+        found = gedcheck.run(tree, {"marriages"})
+        # Folded duplicates ("fix") first, then person-only ("review").
+        for f in sorted(found, key=lambda f: f.kind != "fix"):
             ev = at[f.line]
             fixes.append((f.who, ev.date, ev.place, f.what, "fix " + f.fix))
     if fixes:

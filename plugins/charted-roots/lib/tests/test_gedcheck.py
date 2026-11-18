@@ -100,6 +100,15 @@ class Duplicates(unittest.TestCase):
         found = check(EVEN_MARR)
         self.assertEqual([f.check for f in found], ["marriage-on-person"])
 
+    def test_even_blocks_are_duplicates_only_with_the_same_type(self):
+        def blocks(t2):
+            return indi("1 EVEN", "2 TYPE Arrival", "2 DATE 1 JUN 1830",
+                        "2 PLAC Musterdorf", "1 EVEN", f"2 TYPE {t2}",
+                        "2 DATE 1 JUN 1830", "2 PLAC Musterdorf")
+        self.assertEqual(
+            [f.check for f in check(blocks("Arrival"))], ["dup-event-exact"])
+        self.assertEqual(check(blocks("Departure")), [])
+
 
 PERSON_MARRIAGES = """0 @I1@ INDI
 1 NAME Jürgen /Muster/

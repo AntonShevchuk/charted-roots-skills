@@ -735,6 +735,18 @@ class PersonMarriages(CliCase):
         self.assertIn("no family", loose)
         self.assertIn("add the spouse", loose)
 
+    def test_folded_duplicates_print_before_person_only_marriages(self):
+        self.write("FamilyTree.ged", PERSON_MARRIAGES.replace(
+            "0 @I1@ INDI", """0 @I0@ INDI
+1 NAME Karl /Frueh/
+1 EVEN
+2 TYPE MARR
+2 DATE 1 JUN 1800
+0 @I1@ INDI""", 1))
+        _, out, _ = self.run_cli()
+        section = out[out.index("FIX UPSTREAM"):]
+        self.assertLess(section.index("@I1@"), section.index("@I0@"))
+
     def test_a_clean_tree_has_no_such_section(self):
         self.write("FamilyTree.ged", GED)
         _, out, _ = self.run_cli()
