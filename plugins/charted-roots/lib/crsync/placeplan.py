@@ -13,7 +13,7 @@ import os
 from collections import Counter
 from dataclasses import dataclass, field
 
-from . import gedcom, places, vault
+from . import config, create, gedcom, places, vault
 
 PLAN_PATH = "History/places-plan.json"
 VERSION = 1
@@ -207,3 +207,194 @@ def extract(plan: Plan, counts: Counter, index: places.Index,
         plan.plac[plac] = entry
         res.added.append(plac)
     return res
+
+
+# -- check ---------------------------------------------------------------
+
+
+def _chain(plan: Plan, place: PlannedPlace) -> list[PlannedPlace]:
+    """`place` and its ancestors, nearest first. Stops at a gap or a cycle."""
+    out, seen, cur = [], set(), place
+    while cur is not None and cur.key not in seen:
+        out.append(cur)
+        seen.add(cur.key)
+        cur = plan.places.get(cur.parent) if cur.parent else None
+    return out
+
+
+def basename_for(place: PlannedPlace, plan: Plan, taken: set) -> str:
+    """The note name: the title, else `title, parent`, then each ancestor.
+
+    `taken` is compared case-insensitively, since the places folder may sit on
+    a case-insensitive filesystem. A name that is still taken once the chain
+    runs out gets a number.
+    """
+    low = {t.casefold() for t in taken}
+    titles = [p.title for p in _chain(plan, place)]
+    for n in range(1, len(titles) + 1):
+        name = create.sanitise(", ".join(titles[:n]))
+        if name.casefold() not in low:
+            return name
+    base, n = create.sanitise(", ".join(titles)), 2
+    while f"{base} {n}".casefold() in low:
+        n += 1
+    return f"{base} {n}"
+
+
+def _full_name(place: PlannedPlace, plan: Plan) -> str:
+    return ", ".join(p.title for p in _chain(plan, place))
+
+
+def render_note(place: PlannedPlace, plan: Plan, basenames: dict,
+                cr_ids: dict) -> str:
+    """The text of a new Place note. `basenames` and `cr_ids` are by plan key."""
+    parent = plan.places.get(place.parent) if place.parent else None
+    lines = ["---", "cr_type: place", f"cr_id: {cr_ids.get(place.key, '')}",
+             f"title: {vault.quote(place.title)}",
+             f"place_type: {vault.quote(place.place_type)}"]
+    link = ""
+    if parent is not None:
+        link = f"[[{basenames.get(parent.key, parent.title)}]]"
+        lines.append(f'parent_place: "{link}"')
+        if cr_ids.get(parent.key):
+            lines.append(f"parent_place_id: {cr_ids[parent.key]}")
+    lines.append(f"full_name: {vault.quote(_full_name(place, plan))}")
+    aliases = [a for a in place.aliases if isinstance(a, str)] \
+        if isinstance(place.aliases, list) else []
+    if aliases:
+        lines.append("aliases:")
+        lines.extend(f"  - {vault.quote(a)}" for a in aliases)
+    lines.append("---")
+    text = "\n".join(lines) + "\n"
+    if link:
+        text += f"**Part of:** {link}\n"
+    return text
+
+
+def _validate(plan: Plan, cfg: config.Config) -> list[str]:
+    problems = []
+    types = config.PLACE_TYPES | cfg.custom_place_types
+    reported = set()
+    for key, p in plan.places.items():
+        if p.status not in STATUSES:
+            problems.append(f"{key}: unknown status {p.status!r}")
+        if (not isinstance(p.aliases, list)
+                or not all(isinstance(a, str) for a in p.aliases)):
+            problems.append(f"{key}: aliases must be a list of strings")
+        if p.place_type not in types:
+            problems.append(f"{key}: place_type {p.place_type!r} is not valid")
+        if p.parent and p.parent not in plan.places:
+            problems.append(f"{key}: parent {p.parent!r} not in plan")
+        seen, cur = [], p
+        while cur is not None and cur.key not in seen:
+            seen.append(cur.key)
+            cur = plan.places.get(cur.parent) if cur.parent else None
+        if cur is not None:
+            loop = seen[seen.index(cur.key):]
+            if frozenset(loop) not in reported:
+                reported.add(frozenset(loop))
+                problems.append(
+                    f"{key}: parent cycle {' -> '.join(loop + [cur.key])}")
+    firsts: dict = {}
+    for key, p in plan.places.items():
+        slot = (p.parent, places.key(p.title))
+        if slot in firsts:
+            problems.append(
+                f"{key}: same title as {firsts[slot]!r} under parent "
+                f"{p.parent or '(none)'!r}")
+        else:
+            firsts[slot] = key
+    for plac, e in plan.plac.items():
+        if e.status not in PLAC_STATUSES:
+            problems.append(f"{plac}: unknown status {e.status!r}")
+        if e.place and e.place not in plan.places:
+            problems.append(f"{plac}: place {e.place!r} not in plan")
+    return problems
+
+
+def _existing_note(place: PlannedPlace, existing: list, cfg: config.Config):
+    for n in existing:
+        if place.cr_id and n.scalar("cr_id") == place.cr_id:
+            return n
+    if place.file:
+        want = os.path.normpath(os.path.join(cfg.root, place.file))
+        for n in existing:
+            if os.path.normpath(n.path) == want:
+                return n
+    return None
+
+
+def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
+    """Problems that must be fixed before `apply`; an empty list means OK.
+
+    Never writes. The last test is the one that matters: every approved PLAC,
+    looked up in the vault as it will be after `apply`, must land on its own
+    planned Place and on no other.
+    """
+    problems = _validate(plan, cfg)
+
+    # Note names and ids: real for created places, simulated for the rest.
+    taken_names = {n.basename for n in existing}
+    taken_ids = {n.scalar("cr_id") for n in existing if n.scalar("cr_id")}
+    taken_ids |= {p.cr_id for p in plan.places.values() if p.cr_id}
+    basenames, cr_ids, real, fresh = {}, {}, {}, {}
+    for key, p in plan.places.items():
+        if p.status != "created":
+            continue
+        note = _existing_note(p, existing, cfg)
+        if note is None:
+            problems.append(f"{key}: created, but its note was not found")
+            basenames[key] = os.path.splitext(os.path.basename(p.file))[0] \
+                or p.title
+            continue
+        real[key] = note
+        basenames[key] = note.basename
+        cr_ids[key] = note.scalar("cr_id") or p.cr_id
+    pending = [k for k, p in plan.places.items() if p.status != "created"]
+    pending.sort(key=lambda k: plan.places[k].status != "approved")
+    for key in pending:
+        p = plan.places[key]
+        basenames[key] = basename_for(p, plan, taken_names)
+        taken_names.add(basenames[key])
+        cr_ids[key] = create.mint_cr_id(taken_ids)
+        if p.status == "approved":
+            if p.parent in plan.places and plan.places[p.parent].status not in {
+                    "approved", "created"}:
+                problems.append(
+                    f"{key}: approved, but parent {p.parent!r} is not")
+            note = vault.parse_text(
+                render_note(p, plan, basenames, cr_ids),
+                os.path.join(cfg.places, basenames[key] + ".md"))
+            fresh[key] = note
+
+    # A non-created place must not duplicate a note the plugin already sees.
+    current = places.Index(list(existing))
+    for key in pending:
+        p = plan.places[key]
+        hit = current.by_full_name.get(places.key(_full_name(p, plan)))
+        how = "full_name"
+        parent = plan.places.get(p.parent) if p.parent else None
+        if hit is None and parent is not None:
+            hit = current.by_title_parent.get(
+                f"{places.key(p.title)}|{places.key(basenames[parent.key])}")
+            how = "title and parent"
+        if hit is not None:
+            problems.append(
+                f"{key}: already exists as '{hit.basename}' (same {how})")
+
+    # Every approved string must resolve to its own planned place.
+    approved = approved_placs(plan)
+    index = places.Index(list(existing) + list(fresh.values()),
+                         approved=approved)
+    expected = {**real, **fresh}
+    for plac, e in plan.plac.items():
+        if places.key(plac) not in approved or e.place not in expected:
+            continue
+        want = expected[e.place]
+        got = index.find(plac)
+        if got is not want:
+            where = f"'{got.basename}'" if got is not None else "no Place"
+            problems.append(
+                f"{plac}: resolves to {where}, not its planned place "
+                f"{e.place!r} ('{want.basename}')")
+    return problems
