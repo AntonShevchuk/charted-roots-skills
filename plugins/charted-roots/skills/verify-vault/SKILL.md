@@ -1,11 +1,11 @@
 ---
-name: vault-verify
+name: verify-vault
 description: Use when checking the vault for consistency — after adding records, merging, a GEDCOM sync or re-import, bulk edits, or when asked to verify, audit or health-check the vault or a part of it. Read-only; reports findings, fixes nothing without approval.
 ---
 
 # Verify the vault
 
-Read-only. `scripts/` here is the vault's shared toolkit — `gedcom-sync` and `add-archive-record` use it too; tests: `cd scripts && python3 -m unittest discover -s tests -t .`. Runs the scripted invariants, then the checks not yet scripted, and reports what is new. Rules being checked live in `references/charted-roots-model.md` (the core model, which the other skills in this plugin read too), overridden by the vault's `CLAUDE.md` and the convention modules it loads; skip the rows of a module the vault does not use.
+Read-only. The scripts are the plugin's shared toolkit in `${CLAUDE_SKILL_DIR}/../../lib` — `sync-gedcom` and `add-archive-record` use it too; tests: `cd ${CLAUDE_SKILL_DIR}/../../lib && python3 -m unittest discover -s tests -t .`. Runs the scripted invariants, then the checks not yet scripted, and reports what is new. Rules being checked live in `references/charted-roots-model.md` (the core model, which the other skills in this plugin read too), overridden by the vault's `CLAUDE.md` and the convention modules it loads; skip the rows of a module the vault does not use.
 
 ## Scope
 
@@ -15,14 +15,14 @@ Read-only. `scripts/` here is the vault's shared toolkit — `gedcom-sync` and `
 ## 1. Scripted invariants
 
 ```sh
-python3 "${CLAUDE_SKILL_DIR}/scripts/vault_verify.py" --limit 50   # from the vault root
+python3 "${CLAUDE_SKILL_DIR}/../../lib/vault_verify.py" --limit 50   # from the vault root
 ```
 
 Vault-wide always (cheap). Exit 0 pass, 1 a check failed, 2 could not start — fix the input on 2, never report it as a pass. Covers: frontmatter closes and parses, `cr_id` unique, `cr_type` / `source_type` / `place_type` vocabularies, filenames, Citation `subject_id` and both-direction `citations:` links, `_id` parity and targets, wikilinks (code masked, `History/` exempt), Event precision without date, Person `born`/`died` against the plugin's date validator.
 
 ## 2. Checks not yet scripted
 
-Run over the scope with a throwaway script in the scratchpad (read notes with `crsync.vault.iter_notes` / `parse`, folders from `crsync.config.load`, via `sys.path.insert(0, '${CLAUDE_SKILL_DIR}/scripts')` — no YAML library is installed). Mask fenced blocks and inline code before reading body links.
+Run over the scope with a throwaway script in the scratchpad (read notes with `crsync.vault.iter_notes` / `parse`, folders from `crsync.config.load`, via `sys.path.insert(0, '${CLAUDE_SKILL_DIR}/../../lib')` — no YAML library is installed). Mask fenced blocks and inline code before reading body links.
 
 | Area | Check |
 |---|---|

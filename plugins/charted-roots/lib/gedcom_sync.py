@@ -6,11 +6,11 @@ Places: it mints a fresh random cr_id per record and resolves the resulting
 filename collisions as `Name 1.md`. It writes `external_id` and `gedcom_id`
 but never reads them back. This script does the join the plugin skips.
 
-    python3 <vault-verify>/scripts/gedcom_sync.py              dry run, full report
-    python3 <vault-verify>/scripts/gedcom_sync.py --apply      write
+    python3 <lib>/gedcom_sync.py              dry run, full report
+    python3 <lib>/gedcom_sync.py --apply      write
 
 Dry run is the default; nothing is written without --apply. The vault
-invariants run standalone as <vault-verify>/scripts/vault_verify.py; `--verify` here is an
+invariants run standalone as <lib>/vault_verify.py; `--verify` here is an
 alias kept for the History run records that quote it.
 
 Exit codes: 0 success; 1 the run found a problem (a failed invariant, a

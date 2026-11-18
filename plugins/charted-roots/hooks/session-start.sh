@@ -5,7 +5,7 @@
 vault="${CLAUDE_PROJECT_DIR:-$PWD}"
 [ -f "$vault/.obsidian/plugins/charted-roots/data.json" ] || exit 0
 
-model="${CLAUDE_PLUGIN_ROOT}/skills/vault-verify/references/charted-roots-model.md"
+model="${CLAUDE_PLUGIN_ROOT}/skills/verify-vault/references/charted-roots-model.md"
 [ -f "$model" ] || exit 0
 
 # A vault that imports its own copy of the model already has it in context.

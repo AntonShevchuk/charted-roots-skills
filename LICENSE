@@ -22,7 +22,7 @@ SOFTWARE.
 
 ---
 
-plugins/charted-roots/skills/ancestry-research/ is adapted from
+plugins/charted-roots/skills/research-ancestry/ is adapted from
 https://github.com/DenisSergeevitch/ex-ussr-kinship-research and remains under
 that project's MIT License, reproduced in its own LICENSE file
 (Copyright (c) 2026 Denis Shiryaev).

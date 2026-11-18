@@ -24,16 +24,18 @@ the plugin skips.
 
 ## Usage
 
+`<lib>` below is this folder, the plugin's `lib/`.
+
 `vault_verify.py` runs the invariant suite alone: no GEDCOM, never writes,
 `--vault` and `--limit` only. It is the baseline before and after any edit,
 not just a sync. `gedcom_sync.py --verify` is an alias for it, kept for the
 History run records that quote it.
 
-    python3 <vault-verify>/scripts/vault_verify.py             # vault invariants, no GEDCOM
-    python3 <vault-verify>/scripts/gedcom_sync.py              # dry run, full report
-    python3 <vault-verify>/scripts/gedcom_sync.py --out r.txt  # also write the report to a file
-    python3 <vault-verify>/scripts/gedcom_sync.py --apply      # write
-    python3 <vault-verify>/scripts/gedcom_sync.py --only person,source
+    python3 <lib>/vault_verify.py             # vault invariants, no GEDCOM
+    python3 <lib>/gedcom_sync.py              # dry run, full report
+    python3 <lib>/gedcom_sync.py --out r.txt  # also write the report to a file
+    python3 <lib>/gedcom_sync.py --apply      # write
+    python3 <lib>/gedcom_sync.py --only person,source
 
 Python 3, standard library only. No dependencies, no venv, no manifest.
 
@@ -123,7 +125,7 @@ changes the rulings still cover.
 
 ## Tests
 
-    cd <vault-verify>/scripts && python3 -m unittest discover -s tests -t .
+    cd <lib> && python3 -m unittest discover -s tests -t .
 
 Standard library `unittest`, no dependencies, about two seconds. Two of them
 read the real vault: every note must survive a parse/render cycle
@@ -136,7 +138,7 @@ against a throwaway vault with its own git repository, which is what pins the
 report's "N notes modified" to the count `git diff` actually shows.
 
 The method for an actual sync — what to check, in what order, and what the
-script refuses to do — is the `gedcom-sync` skill.
+script refuses to do — is the `sync-gedcom` skill.
 
 ## How it matches
 
@@ -167,23 +169,23 @@ current figures in a few seconds.
 
 ## Layout
 
-    <vault-verify>/scripts/gedcom_sync.py      sync CLI
-    <vault-verify>/scripts/vault_verify.py     invariant CLI (also gedcom_sync.py --verify)
-    <vault-verify>/scripts/fix_person_dates.py one-off: born/died into validator-clean forms
-    <vault-verify>/scripts/crsync/vault.py     frontmatter reader/writer (line-preserving)
-    <vault-verify>/scripts/crsync/config.py    folder layout, read from data.json
-    <vault-verify>/scripts/crsync/gedcom.py    GEDCOM parser, incl. EVEN and OBJE
-    <vault-verify>/scripts/crsync/dates.py     date forms, and a port of the plugin's date validator
-    <vault-verify>/scripts/crsync/places.py    the plugin's place cache semantics
-    <vault-verify>/scripts/crsync/match.py     Person and Source joins
-    <vault-verify>/scripts/crsync/events.py    the Event key cascade
-    <vault-verify>/scripts/crsync/citations.py Citation join
-    <vault-verify>/scripts/crsync/verify.py    the invariant suite
-    <vault-verify>/scripts/crsync/report.py    the dry-run report and the --apply log
-    <vault-verify>/scripts/crsync/apply.py     the write layer, and its preconditions
-    <vault-verify>/scripts/crsync/create.py    new notes for records with no counterpart
-    <vault-verify>/scripts/crsync/decisions.py the accepted-ruling file and its validation
-    <vault-verify>/scripts/tests/              unittest suite
+    <lib>/gedcom_sync.py      sync CLI
+    <lib>/vault_verify.py     invariant CLI (also gedcom_sync.py --verify)
+    <lib>/fix_person_dates.py one-off: born/died into validator-clean forms
+    <lib>/crsync/vault.py     frontmatter reader/writer (line-preserving)
+    <lib>/crsync/config.py    folder layout, read from data.json
+    <lib>/crsync/gedcom.py    GEDCOM parser, incl. EVEN and OBJE
+    <lib>/crsync/dates.py     date forms, and a port of the plugin's date validator
+    <lib>/crsync/places.py    the plugin's place cache semantics
+    <lib>/crsync/match.py     Person and Source joins
+    <lib>/crsync/events.py    the Event key cascade
+    <lib>/crsync/citations.py Citation join
+    <lib>/crsync/verify.py    the invariant suite
+    <lib>/crsync/report.py    the dry-run report and the --apply log
+    <lib>/crsync/apply.py     the write layer, and its preconditions
+    <lib>/crsync/create.py    new notes for records with no counterpart
+    <lib>/crsync/decisions.py the accepted-ruling file and its validation
+    <lib>/tests/              unittest suite
 
 The writer is a **line patcher**, never a serialiser: it replaces only the
 lines of the keys it changes, so every other byte of a note is untouched and

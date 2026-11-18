@@ -4,8 +4,8 @@
 Reads no GEDCOM and writes nothing, so it runs as a baseline before and after
 any edit -- a sync, a merge, a new archive record.
 
-    python3 <vault-verify>/scripts/vault_verify.py
-    python3 <vault-verify>/scripts/vault_verify.py --limit 50
+    python3 <lib>/vault_verify.py
+    python3 <lib>/vault_verify.py --limit 50
 
 Exit codes: 0 every check passed; 1 a check failed; 2 the run could not start
 (unreadable vault or plugin settings).

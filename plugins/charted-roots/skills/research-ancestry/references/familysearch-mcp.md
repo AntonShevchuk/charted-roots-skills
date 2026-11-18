@@ -2,7 +2,7 @@
 
 Read if the FamilySearch MCP is connected in the environment or the user asks to set it up. Use a suitable connection straight away within the task and access rights, once the user has authorised web work for this task (`privacy-and-safety.md`, section 0); no separate mode needs switching on. Without it, continue with browser search and with the material in hand.
 
-**Scope in this vault: read only.** Where the vault has an upstream master (core model § GEDCOM), that hosted tree is the master; vault changes reach the tree only through `gedcom-sync` and upstream edits by the user (`CLAUDE.md` § GEDCOM and any upstream-tree convention). Writing to a FamilySearch tree through the MCP — adding or changing persons, facts, relationships, sources or Memories — is outside the scope of this skill.
+**Scope in this vault: read only.** Where the vault has an upstream master (core model § GEDCOM), that hosted tree is the master; vault changes reach the tree only through `sync-gedcom` and upstream edits by the user (`CLAUDE.md` § GEDCOM and any upstream-tree convention). Writing to a FamilySearch tree through the MCP — adding or changing persons, facts, relationships, sources or Memories — is outside the scope of this skill.
 
 ## 1. Connection and purpose
 

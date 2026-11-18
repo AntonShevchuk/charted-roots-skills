@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Set up a vault
 
-Installs the vault-side files. The core model (`${CLAUDE_SKILL_DIR}/../vault-verify/references/charted-roots-model.md`) is not copied: the plugin's session-start hook loads it into every session in a vault. Templates: `${CLAUDE_SKILL_DIR}/../../templates/` — `CLAUDE.md` and `conventions/*.md`. If that folder is missing (skills copied without the plugin), say so and stop.
+Installs the vault-side files. The core model (`${CLAUDE_SKILL_DIR}/../verify-vault/references/charted-roots-model.md`) is not copied: the plugin's session-start hook loads it into every session in a vault. Templates: `${CLAUDE_SKILL_DIR}/../../templates/` — `CLAUDE.md` and `conventions/*.md`. If that folder is missing (skills copied without the plugin), say so and stop.
 
 Nothing is written until the user approves the plan in step 4. Never overwrite a file without showing the diff first.
 
@@ -17,7 +17,7 @@ Work in the project root (`${CLAUDE_PROJECT_DIR}`). It must contain `.obsidian/p
 ## 2. Inventory what exists
 
 - `CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/conventions/*.md`, `.claude/settings.json`.
-- Local copies of this plugin's skills in `.claude/skills/` (`add-archive-record`, `ancestry-research`, `vault-verify`, `gedcom-sync`): each would appear twice next to the plugin's. Report them; remove only if the user agrees.
+- Local copies of this plugin's skills in `.claude/skills/` (`add-archive-record`, `research-ancestry`, `verify-vault`, `sync-gedcom`): each would appear twice next to the plugin's. Report them; remove only if the user agrees.
 - An existing `CLAUDE.md` that already holds the core model (sections such as *Entity model*, *Invariants*, *Evidence chain*): with the hook loading the model, those sections are duplicates. Propose trimming them, never silently.
 
 ## 3. Propose modules
@@ -64,4 +64,4 @@ Write the approved files. Then report:
 
 - what was created, changed and left alone;
 - next steps: commit the new files; collaborators run `claude plugin install charted-roots@charted-roots-skills --scope project` once per clone; start a new session (or `/reload-plugins`) so the hook loads the model;
-- run `/charted-roots:vault-verify` for a first baseline.
+- run `/charted-roots:verify-vault` for a first baseline.

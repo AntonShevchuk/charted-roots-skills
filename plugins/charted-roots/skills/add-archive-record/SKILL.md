@@ -7,7 +7,7 @@ description: Use when adding an archival document to the vault — a scan, regis
 
 One archival item becomes: scan + transcription in the archive folder, one Source, Events, one Citation per person × fact, and Person updates. The rules are in the core model and the convention modules the vault loads (`archive.md`; `source-collections.md` if present) — read them; this skill sets the order and the checks. Folder names below are the `data.json` keys, never assumed paths.
 
-**Rules.** The core model is `<vault-verify>/references/charted-roots-model.md` (already in context when the plugin's session-start hook ran); the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<vault-verify>` is `${CLAUDE_SKILL_DIR}/../vault-verify`. Run scripts from the vault root.
+**Rules.** The core model is `<verify-vault>/references/charted-roots-model.md` (already in context when the plugin's session-start hook ran); the vault's `CLAUDE.md` and `.claude/conventions/*.md` override it. `<verify-vault>` is `${CLAUDE_SKILL_DIR}/../verify-vault`; `<lib>`, the shared scripts, is `${CLAUDE_SKILL_DIR}/../../lib`. Run scripts from the vault root.
 
 ## Inputs
 
@@ -57,13 +57,13 @@ Scan path and/or the reading (register text, index line), plus whatever locator 
 
    ```sh
    python3 -I -c "
-   import sys,re,pathlib;sys.path.insert(0,'<vault-verify>/scripts')
+   import sys,re,pathlib;sys.path.insert(0,'<lib>')
    from crsync.create import mint_cr_id
    t={m.group(1) for p in pathlib.Path('.').rglob('*.md') for m in re.finditer(r'^cr_id:\s*(\S+)',p.read_text(errors='ignore'),re.M)}
    print(*[mint_cr_id(t) for _ in range(N)])"
    ```
 
-10. **Verify** — `python3 <vault-verify>/scripts/vault_verify.py`. All checks must pass; fix anything the new notes broke. Then re-read each new note once against archive.md: H1 ↔ quote-callout title, `## Linked records` ↔ actual Events/Citations, Person dates ↔ Event dates.
+10. **Verify** — `python3 <lib>/vault_verify.py`. All checks must pass; fix anything the new notes broke. Then re-read each new note once against archive.md: H1 ↔ quote-callout title, `## Linked records` ↔ actual Events/Citations, Person dates ↔ Event dates.
 
 11. **Report and commit.** List created and changed notes, identifications made and left open, and any existing fact changed. Commit only when asked: scan + transcription + all entity notes in one commit, message `Add <year> <event> [No. N] of <names>[; short note]`.
 

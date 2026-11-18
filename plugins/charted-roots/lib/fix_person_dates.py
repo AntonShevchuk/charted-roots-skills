@@ -5,8 +5,8 @@ One-off repair for dates written before `crsync/dates.py` existed (`ABT 1804`,
 `BEF 1909`, `1850-1858`, `25 Dez 1914`). A sync fixes the Persons the export
 matches; this covers the rest. Dry run by default.
 
-    python3 <vault-verify>/scripts/fix_person_dates.py
-    python3 <vault-verify>/scripts/fix_person_dates.py --apply
+    python3 <lib>/fix_person_dates.py
+    python3 <lib>/fix_person_dates.py --apply
 
 Nothing is lost:
 

@@ -4,7 +4,7 @@ An Obsidian vault of genealogy notes managed by the **Charted Roots** plugin, wo
 
 ## Core rules
 
-The entity model, invariants, evidence chain, vocabularies, place and GEDCOM rules ship with the plugin (`skills/vault-verify/references/charted-roots-model.md`); its session-start hook loads them into every session in this vault. This file and the modules below override them where they differ.
+The entity model, invariants, evidence chain, vocabularies, place and GEDCOM rules ship with the plugin (`skills/verify-vault/references/charted-roots-model.md`); its session-start hook loads them into every session in this vault. This file and the modules below override them where they differ.
 
 ## Language
 

@@ -130,7 +130,7 @@ class SourceClient:
         # The only POSTs in these helpers are source searches, never tree mutations.
         data = None if body is None else json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers = {
-            "User-Agent": "ancestry-research/1.0 (source research)",
+            "User-Agent": "research-ancestry/1.0 (source research)",
             "Accept": "application/json" if as_json else "text/html",
         }
         if body is not None:

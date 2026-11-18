@@ -1,5 +1,5 @@
 ---
-name: ancestry-research
+name: research-ancestry
 description: Use when researching a person, family line or kinship question in an Obsidian + Charted Roots vault — planning a search, reading church/metric books, civil registers, revision lists, censuses, military, migration, deportation or repression records, disambiguating namesakes, deciding whether two records are the same person, or drafting an archive request. Strongest for the former USSR, the Russian Empire, Habsburg Galicia/Bukovina and Bessarabia; the evidence method applies anywhere. Writes results into the vault's own notes. Not for tracking living people.
 ---
 
@@ -13,7 +13,7 @@ Adapted (MIT, see `LICENSE`) from `DenisSergeevitch/ex-ussr-kinship-research`. L
 
 ## Rules that win
 
-The core model (`<vault-verify>/references/charted-roots-model.md`, where `<vault-verify>` is `${CLAUDE_SKILL_DIR}/../vault-verify`), the vault's `CLAUDE.md` and its `.claude/conventions/*` override anything in this skill or its references. In particular:
+The core model (`<verify-vault>/references/charted-roots-model.md`, where `<verify-vault>` is `${CLAUDE_SKILL_DIR}/../verify-vault`), the vault's `CLAUDE.md` and its `.claude/conventions/*` override anything in this skill or its references. In particular:
 
 - **Language** — the vault's working language (its `CLAUDE.md`; English if unstated) for prose, headings, labels. Quoted record text, archival designations and native-script names stay verbatim, with a translation beside them. Search queries are written in the *source's* language.
 - **Privacy** — the vault holds living people. **No web search, portal lookup, upload or e-mail without the user's explicit instruction for this task.** Reading local scans and notes needs none.
@@ -47,7 +47,7 @@ Resolve these once per session — from `.obsidian/plugins/charted-roots/data.js
 | Unidentified candidate | stays inside the Hypothesis note — **no Person note** until identified | — |
 | Request to an archive or registry | letters folder note + row in the letters index | `letters.md` |
 | Photo of a person | media folder, `.jpg`/`.pdf` | `archive.md` § Scan files |
-| Upstream tree | its `.ged` — lead, not evidence; synced only via `gedcom-sync` | core model § GEDCOM |
+| Upstream tree | its `.ged` — lead, not evidence; synced only via `sync-gedcom` | core model § GEDCOM |
 
 Without `research.md` the filename prefixes are a suggestion: keep the same split (plan / claim / sweep / reference) in `research_project` notes.
 
@@ -77,7 +77,7 @@ Reading the upstream tree: a tree entry without a cited image is a lead. Never t
 6. **Identify.** Match on the whole cluster — dates, places, relatives, occupation, estate, confession, witnesses, godparents, unit, migration route. A shared household is not kinship; a patronymic alone does not prove paternity. Build compound links edge by edge (grandparent = two parent–child edges). Distinguish biological, legal, adoptive, step and household relationships.
 7. **Conclude.** Update the Hypothesis: evidence for/against per edge, status word, next distinguishing check. Close it per `research.md` (one-field edit). Sensitive findings (adoption, paternity, repression, ethnicity, religion) — neutral wording, only what the question needs, cited.
 8. **Request.** When the answer needs an unpublished record: choose the current custodian and its official channel (`references/correspondence.md`, `references/government-portals.md`), draft in the letters folder in the recipient's language. **Never send**; the user sends.
-9. **Verify and report.** `vault-verify` over the changed notes. Report to the user in the working language: what is established, what is not, search coverage, open routes (who must act, cost/access if known). For a pass, show the new checks and results; say up front when only a title or description was available, giving the designation if known; separately list records/pages read, what was compared, what stays open. Resuming: take prior coverage from the Survey note and justify significant repeats. Editing a biography (Research Notes prose, a narrative for the family): keep each claim's source, locator and caveats per `research-coordination.md`, "Keep the grounds when editing a biography". Commit only when asked. Resuming after a break, or several agents on one question: `references/research-coordination.md`.
+9. **Verify and report.** `verify-vault` over the changed notes. Report to the user in the working language: what is established, what is not, search coverage, open routes (who must act, cost/access if known). For a pass, show the new checks and results; say up front when only a title or description was available, giving the designation if known; separately list records/pages read, what was compared, what stays open. Resuming: take prior coverage from the Survey note and justify significant repeats. Editing a biography (Research Notes prose, a narrative for the family): keep each claim's source, locator and caveats per `research-coordination.md`, "Keep the grounds when editing a biography". Commit only when asked. Resuming after a break, or several agents on one question: `references/research-coordination.md`.
 
 ## Scripts
 
