@@ -140,11 +140,7 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
         a(f"  Non-place values in a GEDCOM PLAC line                   "
           f"{len(nonplace):5}")
         if nonplace:
-            a("        A rank, unit or recruiting office in PLAC. The vault model: a")
-            a("        non-place in a place: field means the event needs fixing")
-            a("        first -- so these are reported, never written as a place.")
-            for e, why in nonplace[:limit]:
-                a(f"        [{why}] {e.owner}  {e.place[:52]}")
+            a("        details: gedcom_check.py --only places")
     a("")
 
     # -- 1. people ----------------------------------------------------
@@ -282,9 +278,8 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
 
     # -- 6. media -----------------------------------------------------
     a("-- 6. MEDIA (OBJE) " + "-" * 59)
-    a(f"  {len(tree.media)} records, 0 importable -- every one has an empty `1 FILE`.")
-    a("  The image lives on Ancestry's servers behind `1 _OID`; `2 TITL` is a")
-    a("  caption, not a path. The plugin dropping these is correct.")
+    empty = sum(1 for m in tree.media.values() if not m.file)
+    a(f"  {len(tree.media)} records, {empty} with an empty `1 FILE` (not importable).")
     a("")
 
     # -- 7. creation --------------------------------------------------
@@ -348,27 +343,16 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
             L.extend(_frontmatter_lines(group[0], "          "))
         a("")
 
-    fixes = []
-    if want("event"):
-        at = {e.line: e for e in tree.events}
-        found = gedcheck.run(tree, {"marriages"})
-        # Folded duplicates ("fix") first, then person-only ("review").
-        for f in sorted(found, key=lambda f: f.kind != "fix"):
-            ev = at[f.line]
-            fixes.append((f.who, ev.date, ev.place, f.what, "fix " + f.fix))
-    if fixes:
-        a(f"-- 8. FIX UPSTREAM (in {host_name(tree)}) " + "-" * max(
-            4, 56 - len(host_name(tree))))
-        a(f"  {len(fixes)} marriages written on a person, not on the family.")
-        a("  The plugin's own import drops them; the sync keeps them, but the")
-        a("  export stays wrong until the host records them on the family.")
+    found = gedcheck.run(tree)
+    if found:
+        host = host_name(tree)
+        a(f"-- 8. GEDCOM CHECK (fix in {host}) " + "-" * max(4, 56 - len(host)))
+        counts = collections.Counter(f.group for f in found)
+        for group in gedcheck.GROUPS:
+            a(f"      {group:<12}{counts.get(group, 0):5}")
+        a(f"  run gedcom_check.py --ged {os.path.relpath(ged_path, cfg.root)} "
+          "for the fix list")
         a("")
-        for person, date, place, what, fix in fixes:
-            a(f"  {person}  marriage {date or '(undated)'}"
-              + (f"  {place}" if place else ""))
-            a(f"      {what}")
-            a(f"      {fix}")
-            a("")
 
     if blocked:
         a("-- WOULD REFUSE " + "-" * 62)

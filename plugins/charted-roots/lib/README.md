@@ -256,12 +256,11 @@ instead of `CONT`; the run warns with the line numbers. A `1 EVEN` whose
 Service` as military, so an individual marriage folds into the family marriage
 it repeats. Other labels are set aside and listed in the report.
 
-A marriage written on a person rather than the family is listed in the
-report's section 8, FIX UPSTREAM, with the host the header names and the fix to
-make there: a duplicate of the family marriage is deleted from the person; one
-only on the person moves onto the family with that spouse (or the spouse is
-added first). The plugin's own import drops both; the sync keeps the
-person-only one as a person-level Event until the host is fixed.
+The report's section 8, GEDCOM CHECK, only counts the GEDCOM findings per group
+(duplicates, marriages, dates, places) and names the host to fix them in; the
+fix list itself comes from `gedcom_check.py --ged <path>`. The sync keeps a
+marriage written only on a person as a person-level Event until the host is
+fixed.
 
 GEDCOM tags map to `event_type` exactly as the Charted Roots importer maps them
 (`crsync/gedcom.py` `TAG_TO_EVENT`, pinned by a test): `CHR` is `christening`,
