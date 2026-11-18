@@ -7,7 +7,7 @@
     {
       "name": "charted-roots",
       "source": "./plugins/charted-roots",
-      "description": "Add archival records with the full evidence chain, run kinship research, verify vault consistency, and reconcile upstream GEDCOM exports without duplicates.",
+      "description": "Add archival records with the full evidence chain, run kinship research, verify vault consistency, check GEDCOM exports for fixes, and reconcile upstream GEDCOM exports without duplicates.",
       "category": "productivity"
     }
   ]

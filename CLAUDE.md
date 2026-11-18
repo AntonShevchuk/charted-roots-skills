@@ -25,7 +25,7 @@ There is no linter or build step.
 
 ## Architecture
 
-**The shared toolkit is `plugins/charted-roots/lib/`.** It holds the `crsync` package plus the CLIs `vault_verify.py`, `gedcom_sync.py`, `places_plan.py` and `fix_person_dates.py`, and is used by `verify-vault`, `sync-gedcom`, `organize-places` and `add-archive-record`. Skills reach it as `<lib>` = `${CLAUDE_SKILL_DIR}/../../lib`, and the scripts are run from the vault root. The core model is still inside a skill, reached as `${CLAUDE_SKILL_DIR}/../verify-vault/references/`, so renaming `verify-vault` means updating the other skills and the hook.
+**The shared toolkit is `plugins/charted-roots/lib/`.** It holds the `crsync` package plus the CLIs `vault_verify.py`, `gedcom_sync.py`, `places_plan.py`, `fix_person_dates.py` and `gedcom_check.py`, and is used by `verify-vault`, `sync-gedcom`, `validate-gedcom`, `organize-places` and `add-archive-record`. Skills reach it as `<lib>` = `${CLAUDE_SKILL_DIR}/../../lib`, and the scripts are run from the vault root. The core model is still inside a skill, reached as `${CLAUDE_SKILL_DIR}/../verify-vault/references/`, so renaming `verify-vault` means updating the other skills and the hook.
 
 **The rules exist in one place.** `skills/verify-vault/references/charted-roots-model.md` is the core model (entity model, invariants, evidence chain, vocabularies, places, GEDCOM, date forms). Every skill reads it instead of restating it. Precedence, lowest to highest: core model → a vault's `CLAUDE.md` → that vault's `.claude/conventions/*.md`.
 
