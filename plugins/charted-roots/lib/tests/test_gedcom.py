@@ -364,6 +364,62 @@ class Folding(unittest.TestCase):
         self.assertIn("I9", tree.individuals)
 
 
+class SourceLines(unittest.TestCase):
+
+    def _parse(self, text):
+        path = ged(text)
+        self.addCleanup(os.unlink, path)
+        return gedcom.parse(path, warn=lambda m: None)
+
+    def test_events_and_records_carry_their_line(self):
+        tree = self._parse(SMALL)
+        ind = tree.individuals["I1"]
+        self.assertEqual(ind.line, 8)                    # "0 @I1@ INDI"
+        birt = next(e for e in ind.events if e.tag == "BIRT")
+        self.assertEqual(birt.line, 17)                  # "1 BIRT"
+        self.assertEqual(tree.families["F1"].line, 50)
+
+    def test_place_raw_survives_marriage_folding(self):
+        tree = self._parse("""0 HEAD
+1 GEDC
+2 VERS 5.5.1
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Anna /Beispiel/
+1 MARR
+2 DATE 3 MAY 1900
+2 PLAC Musterdorf
+1 FAMS @F1@
+0 @F1@ FAM
+1 HUSB @I1@
+1 MARR
+2 DATE 3 MAY 1900
+0 TRLR
+""")
+        ind_ev = next(e for e in tree.individuals["I1"].events if e.tag == "MARR")
+        fam_ev = tree.families["F1"].events[0]
+        self.assertEqual(fam_ev.place, "Musterdorf")
+        self.assertEqual(fam_ev.place_raw, "")
+        self.assertEqual(ind_ev.place_raw, "Musterdorf")
+
+    def test_media_file(self):
+        tree = self._parse("""0 HEAD
+1 GEDC
+2 VERS 5.5.1
+1 CHAR UTF-8
+0 @O1@ OBJE
+1 FILE
+0 @O2@ OBJE
+1 FILE  a.jpg
+0 @O3@ OBJE
+1 _OID x
+0 TRLR
+""")
+        self.assertEqual(tree.media["O1"].file, "")
+        self.assertEqual(tree.media["O2"].file, "a.jpg")
+        self.assertEqual(tree.media["O3"].file, "")
+
+
 def _raw_ged(data: bytes) -> str:
     """Write raw bytes (possibly invalid UTF-8) to a temp .ged; return its path."""
     fd, path = tempfile.mkstemp(suffix=".ged")

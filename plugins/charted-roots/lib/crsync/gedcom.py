@@ -92,6 +92,7 @@ class Node:
     value: str = ""
     xref: str = ""
     children: list = field(default_factory=list)
+    line: int = 0         #: 1-based physical line in the file
 
     def first(self, tag: str):
         for c in self.children:
@@ -116,6 +117,9 @@ class Event:
     date: str = ""        #: ISO, or a BEF/ABT form the vault also permits
     precision: str = "unknown"
     place: str = ""
+    #: the PLAC as written; `place` may also be filled by marriage folding
+    place_raw: str = ""
+    line: int = 0         #: line of the event's tag in the file
     description: str = ""
     even_type: str = ""   #: the `2 TYPE` line, for EVEN blocks
     #: (source xref, page) pairs from `2 SOUR` / `3 PAGE`
@@ -153,6 +157,7 @@ class Individual:
     events: list = field(default_factory=list)
     media: list = field(default_factory=list)
     citations: list = field(default_factory=list)
+    line: int = 0
 
 
 @dataclass
@@ -165,6 +170,7 @@ class Family:
     #: child xref -> {"HUSB": rel, "WIFE": rel}, from Ancestry's `2 _FREL` /
     #: `2 _MREL` under `1 CHIL`, lowercased. Absent means a birth child.
     pedigree: dict = field(default_factory=dict)
+    line: int = 0
 
     def relation(self, child: str, parent_tag: str) -> str:
         """How `child` relates to the HUSB or WIFE: "birth", "step", ..."""
@@ -187,6 +193,7 @@ class MediaObj:
     form: str = ""
     mtype: str = ""
     oid: str = ""
+    file: str = ""       #: the `1 FILE` value, stripped
 
 
 def normalise_date(raw: str) -> tuple:
@@ -366,7 +373,8 @@ def _tree(path: str, warnings: list | None = None) -> list:
                 target.value += ("\n" if tag == "CONT" else "") + value
                 continue
 
-            node = Node(level=level, tag=tag, value=value, xref=xref)
+            node = Node(level=level, tag=tag, value=value, xref=xref,
+                        line=number)
             while stack and stack[-1][0] >= level:
                 stack.pop()
             if stack:
@@ -406,6 +414,8 @@ def _read_event(owner: str, node: Node) -> Event | None:
     ev.date_raw = node.val("DATE")
     ev.date, ev.precision = normalise_date(ev.date_raw)
     ev.place = node.val("PLAC")
+    ev.place_raw = ev.place
+    ev.line = node.line
     ev.description = node.value.strip() if node.value.strip() not in ("", "Y") else ""
     ev.citations = _read_citations(node)
     return ev
@@ -469,7 +479,7 @@ def parse(path: str, warn=None) -> Tree:
                 "charset": rec.val("CHAR"),
             }
         elif rec.tag == "INDI":
-            ind = Individual(xref=rec.xref)
+            ind = Individual(xref=rec.xref, line=rec.line)
             all_names = rec.all("NAME")
             if all_names:
                 name = all_names[0]
@@ -505,7 +515,7 @@ def parse(path: str, warn=None) -> Tree:
             _assign_ordinals(ind.events)
             tree.individuals[ind.xref] = ind
         elif rec.tag == "FAM":
-            fam = Family(xref=rec.xref)
+            fam = Family(xref=rec.xref, line=rec.line)
             fam.husband = rec.val("HUSB").strip("@")
             fam.wife = rec.val("WIFE").strip("@")
             fam.children = [c.value.strip("@") for c in rec.all("CHIL")]
@@ -535,7 +545,8 @@ def parse(path: str, warn=None) -> Tree:
             tree.sources[src.xref] = src
         elif rec.tag == "OBJE":
             fil = rec.first("FILE")
-            obj = MediaObj(xref=rec.xref, oid=rec.val("_OID"))
+            obj = MediaObj(xref=rec.xref, oid=rec.val("_OID"),
+                           file=(fil.value.strip() if fil is not None else ""))
             if fil is not None:
                 obj.title = fil.val("TITL")
                 form = fil.first("FORM")
