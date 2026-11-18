@@ -24,7 +24,7 @@ python3 $S/gedcom_sync.py --out <scratchpad>/sync.txt    # dry run
 ## Steps
 
 1. **Baseline** — `vault_verify.py`. Record which checks already fail: `--apply` compares the suite before and after and calls only the difference a regression. Exit 2 means the run did not start, not a pass.
-2. **Dry run** and read section 0 first. Report to the user: adoption candidates, unresolved PLAC values, non-places in PLAC, citation duplicates, held `coarsen` / `conflict` changes, WOULD REFUSE lines.
+2. **Dry run** and read section 0 first. Report to the user: adoption candidates, unresolved PLAC values (next step: `organize-places`), non-places in PLAC, citation duplicates, held `coarsen` / `conflict` changes, WOULD REFUSE lines.
 3. **Stop for rulings.** Held changes, adoptions (`--adopt-by-name`) and creation (`--create`) are the user's decisions. Write a ruling into the decisions file only when the user gives it, with their reason.
 4. **Preview** `--create` on a dry run if creation is wanted; list the planned notes.
 5. **Apply — only on explicit approval.** The user quits Obsidian; commit the entity folders; tag `pre-gedcom-sync-$(date +%Y%m%d-%H%M)`; then `--apply`, scoped with `--only` for a large sync. The script refuses without all three. Never pass `--allow-obsidian-open`, `--allow-dirty` or `--no-restore-point` unasked.
@@ -33,7 +33,7 @@ python3 $S/gedcom_sync.py --out <scratchpad>/sync.txt    # dry run
 
 ## What the script will not do
 
-- **Create Places**, or write a PLAC value it cannot resolve against the gazetteer — the place hierarchy is a schema decision and its own pass.
+- **Create Places**, or write a PLAC value it cannot resolve against the gazetteer — the place hierarchy is a schema decision and its own pass: the `organize-places` skill. A historical PLAC links through aliases only once that skill's plan approves it.
 - **Create an Event for a suppressed `EVEN` block** — an obituary, testament or licence block is a Source reporting an event.
 - **Delete anything** — vault-only People, Sources and Events are reported as orphans and left alone.
 - **Touch a note whose frontmatter it cannot fully parse**, or whose `---` block never closes.

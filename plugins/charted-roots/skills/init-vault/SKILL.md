@@ -17,7 +17,7 @@ Work in the project root (`${CLAUDE_PROJECT_DIR}`). It must contain `.obsidian/p
 ## 2. Inventory what exists
 
 - `CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/conventions/*.md`, `.claude/settings.json`.
-- Local copies of this plugin's skills in `.claude/skills/` (`add-archive-record`, `research-ancestry`, `verify-vault`, `sync-gedcom`): each would appear twice next to the plugin's. Report them; remove only if the user agrees.
+- Local copies of this plugin's skills in `.claude/skills/` (`add-archive-record`, `research-ancestry`, `verify-vault`, `sync-gedcom`, `organize-places`): each would appear twice next to the plugin's. Report them; remove only if the user agrees.
 - An existing `CLAUDE.md` that already holds the core model (sections such as *Entity model*, *Invariants*, *Evidence chain*): with the hook loading the model, those sections are duplicates. Propose trimming them, never silently.
 
 ## 3. Propose modules

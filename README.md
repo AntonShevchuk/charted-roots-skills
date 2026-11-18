@@ -8,6 +8,7 @@ Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault manage
 | `research-ancestry` | Plan and run a kinship investigation; regional guides (former USSR, Russian Empire, Galicia/Bukovina, Bessarabia); draft archive requests |
 | `verify-vault` | Read-only consistency audit. Runs the shared toolkit in `lib/` (`crsync`, standard-library Python), which the other skills call too |
 | `sync-gedcom` | Reconcile an upstream GEDCOM export without the duplicates the plugin's import wizard creates |
+| `organize-places` | Map a GEDCOM's historical place names to Place notes under modern borders, with the old names as aliases; reviewed in batches |
 | `init-vault` | One-time vault setup: `CLAUDE.md`, convention modules, project-scope plugin settings (run it as `/charted-roots:init-vault`) |
 
 ## Install

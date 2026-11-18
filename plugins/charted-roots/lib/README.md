@@ -69,8 +69,9 @@ write a place that does not resolve to a Place note.
 
 A historical PLAC (`Breslau, Schlesien, ...`) links through Place aliases only
 when `History/places-plan.json` approves that exact string (see
-`/charted-roots:organize-places`); an unreadable plan turns alias matching off
-for the run and prints a warning. An empty Person `birth_place:` /
+`/charted-roots:organize-places`), so it resolves PLACs the plugin's wizard
+would not; an unreadable plan turns alias matching off for the run and prints
+a warning. An empty Person `birth_place:` /
 `death_place:` / `burial_place:` is filled with a `[[Place]]` link once the
 PLAC resolves.
 
@@ -105,6 +106,35 @@ to run until Obsidian is closed, the entity folders are clean in git, and a
 Add it to a dry run first: section 7 previews every planned note — paths, the
 first of each kind in full, the follow-up relationship and citation passes,
 and everything the planner left for a human.
+
+## places_plan
+
+`places_plan.py` builds the Place notes behind historical PLAC strings; the
+`organize-places` skill drives it. The reviewed plan is
+`History/places-plan.json`: `places` (modern Places, keyed by plan key, with
+`title`, `place_type`, `parent`, `aliases`, `reason`, `status` of `proposed` /
+`approved` / `created`) and `plac` (each PLAC string with `count` and a `place`
+key, or `not_place`, or `unidentified`; `status` `proposed` / `approved`).
+
+    python3 <lib>/places_plan.py extract [--ged FILE]   # list PLAC strings into the plan
+    python3 <lib>/places_plan.py check                  # validate; never writes
+    python3 <lib>/places_plan.py apply                  # dry run
+    python3 <lib>/places_plan.py apply --apply          # write approved places
+
+`extract` adds only strings not yet in the plan and refreshes counts; it never
+drops a reviewed entry. `check` fails on a missing parent, a cycle, an invalid
+`place_type`, a duplicate title under one parent, a Place that already exists,
+or an approved PLAC that would not resolve to its own planned Place. `apply`
+refuses a plan that fails `check`; with `--apply` it writes approved places
+only, parents first, adds missing `aliases:` to an existing Place (nothing else
+on it changes) and marks each handled place `created`. `--apply` has the same
+preconditions as `gedcom_sync.py --apply` (Obsidian closed, entity folders
+clean in git, a `pre-organize-places-*` tag on HEAD) and the same
+before/after `vault_verify` comparison; `--no-restore-point`,
+`--allow-obsidian-open` and `--allow-dirty` are `--apply` only, `--ged` is
+`extract` only. Exit codes: 0 success; 1 a plan that fails `check`, a refused
+precondition or a regression; 2 the run could not start (bad flags,
+unreadable vault, plan or GEDCOM).
 
 ## Decisions
 
@@ -178,12 +208,14 @@ current figures in a few seconds.
 
     <lib>/gedcom_sync.py      sync CLI
     <lib>/vault_verify.py     invariant CLI (also gedcom_sync.py --verify)
+    <lib>/places_plan.py      places plan CLI (extract, check, apply)
     <lib>/fix_person_dates.py one-off: born/died into validator-clean forms
     <lib>/crsync/vault.py     frontmatter reader/writer (line-preserving)
     <lib>/crsync/config.py    folder layout, read from data.json
     <lib>/crsync/gedcom.py    GEDCOM parser, incl. EVEN and OBJE
     <lib>/crsync/dates.py     date forms, and a port of the plugin's date validator
     <lib>/crsync/places.py    the plugin's place cache semantics
+    <lib>/crsync/placeplan.py the places plan: extract, check, apply
     <lib>/crsync/match.py     Person and Source joins
     <lib>/crsync/events.py    the Event key cascade
     <lib>/crsync/citations.py Citation join
