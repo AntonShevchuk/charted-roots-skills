@@ -1,6 +1,10 @@
-# charted-roots-skills
+# Charted Roots Skills
 
-Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault managed by the [**Charted Roots**](https://chartedroots.com/) plugin.
+Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault managed by the [Charted Roots](https://chartedroots.com/) plugin.
+
+![Obsidian, Charted Roots and Claude](docs/images/header.jpg)
+
+## Skills
 
 | Skill | Use |
 |---|---|
