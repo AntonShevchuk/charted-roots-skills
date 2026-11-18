@@ -138,7 +138,7 @@ tree's host (`in Ancestry: ...`, from the HEAD `SOUR`).
 | `date-nonstandard` | dates | fix | A date the importer reads but GEDCOM does not allow (German months, ISO, `c.`, `About`, `December`); the finding gives the standard form. Letter case and a dot after a keyword (`Abt.`, `Bef.`, `BET.`) count as standard |
 | `date-order` | dates | review | Dates that cannot be right: death before birth, burial before death, birth before a parent's, a lifespan over 120 years |
 | `place-non-place` | places | fix | A PLAC that is a unit or rank, not a place |
-| `place-format` | places | fix | Stray spaces or commas in a PLAC (spacing variants go here, not to `place-variant`) |
+| `place-format` | places | fix / review | Stray spaces or commas in a PLAC (spacing variants go here, not to `place-variant`). When the HEAD declares `1 PLAC` / `2 FORM`, a string whose only issue is empty components is a review, since the host writes those as positional placeholders |
 | `place-variant` | places | fix | One place written several ways (accents, case, US-state abbreviations such as `TX` / `Texas`); names the most used spelling, or suggests one (preferring the accented form) when the counts tie |
 | `place-hierarchy` | places | fix / review | A place that is a subset of a fuller place with the same leaf. Only the fullest forms are listed, so nested forms give one finding. A bare leaf with one fullest candidate is a fix; anything else is a review |
 

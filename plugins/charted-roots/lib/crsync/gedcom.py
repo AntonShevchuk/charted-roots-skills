@@ -472,11 +472,15 @@ def parse(path: str, warn=None) -> Tree:
     for rec in records:
         if rec.tag == "HEAD":
             sour = rec.first("SOUR")
+            plac = rec.first("PLAC")
             tree.header = {
                 "source": sour.value if sour else "",
                 "version": (rec.first("GEDC").val("VERS") if rec.first("GEDC") else ""),
                 "date": rec.val("DATE"),
                 "charset": rec.val("CHAR"),
+                #: the HEAD's `1 PLAC` / `2 FORM`: empty components in a
+                #: PLAC are then positional placeholders the host writes
+                "plac_form": plac.val("FORM") if plac else "",
             }
         elif rec.tag == "INDI":
             ind = Individual(xref=rec.xref, line=rec.line)

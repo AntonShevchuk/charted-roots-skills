@@ -722,7 +722,8 @@ class PersonMarriages(CliCase):
         section = out[out.index("GEDCOM CHECK"):]
         self.assertIn("in MyHeritage", section)
         self.assertRegex(section, r"marriages\s+2")
-        self.assertIn("gedcom_check.py", section)
+        self.assertIn("validate-gedcom skill", section)
+        self.assertIn("gedcom_check.py --ged FamilyTree.ged", section)
         self.assertNotIn("delete the person-level marriage", out)
 
     def test_section_shows_under_only(self):

@@ -327,6 +327,7 @@ def _places(tree, host):
     def line(uses):
         return min(ev.line for _, ev in uses)
 
+    plac_form = tree.header.get("plac_form", "")
     by_clean: dict = {}    # cleaned string -> [(who, event)]
     for raw, uses in by_raw.items():
         shown = f"\"{raw}\" ({_uses(len(uses))})"
@@ -342,10 +343,18 @@ def _places(tree, host):
         if not cleaned:
             continue
         if raw != cleaned and re.sub(r",(?=\S)", ", ", raw) != cleaned:
-            yield Finding(
-                "place-format", "places", "fix", who, line(uses),
-                f"PLAC {shown} has stray spaces or commas",
-                f"in {host}: write \"{raw}\" as \"{cleaned}\"")
+            spaced = ", ".join(" ".join(p.split()) for p in raw.split(","))
+            if plac_form and raw in (spaced, re.sub(r",(?=\S)", ", ", spaced)):
+                yield Finding(
+                    "place-format", "places", "review", who, line(uses),
+                    f"PLAC {shown} has empty jurisdiction levels",
+                    f"in {host}: empty jurisdiction levels; fill them or "
+                    f"leave them if your host's place format needs them")
+            else:
+                yield Finding(
+                    "place-format", "places", "fix", who, line(uses),
+                    f"PLAC {shown} has stray spaces or commas",
+                    f"in {host}: write \"{raw}\" as \"{cleaned}\"")
         by_clean.setdefault(cleaned, []).extend(uses)
 
     groups: dict = {}      # fold -> [cleaned strings]

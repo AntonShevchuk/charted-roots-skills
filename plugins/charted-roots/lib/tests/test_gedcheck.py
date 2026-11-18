@@ -26,6 +26,19 @@ def check(text, only=None):
     return gedcheck.run(tree, only)
 
 
+PLAC_FORM_HEAD = HEAD.replace(
+    "1 CHAR UTF-8\n", "1 CHAR UTF-8\n1 PLAC\n2 FORM City, County, State, Country\n")
+
+
+def check_with(head, text):
+    path = ged(head + text)
+    try:
+        tree = gedcom.parse(path, warn=lambda m: None)
+    finally:
+        os.unlink(path)
+    return gedcheck.run(tree)
+
+
 def only(findings, name):
     hits = [f for f in findings if f.check == name]
     assert len(hits) == 1, findings
@@ -260,6 +273,21 @@ class Places(unittest.TestCase):
     def test_format(self):
         f = only(check(PLAC("Berlin ,  Preußen,")), "place-format")
         self.assertIn('"Berlin, Preußen"', f.fix)
+
+    def test_empty_components_are_a_fix_without_plac_form(self):
+        f = only(check(PLAC("Berlin, , Germany")), "place-format")
+        self.assertEqual(f.kind, "fix")
+
+    def test_empty_components_are_a_review_under_plac_form(self):
+        text = indi("1 RESI", "2 DATE 1 JUN 1830", "2 PLAC , , Berlin, Germany")
+        f = only(check_with(PLAC_FORM_HEAD, text), "place-format")
+        self.assertEqual(f.kind, "review")
+        self.assertIn("empty jurisdiction levels", f.fix)
+
+    def test_other_format_issues_stay_a_fix_under_plac_form(self):
+        text = indi("1 RESI", "2 DATE 1 JUN 1830", "2 PLAC Berlin ,  , Germany")
+        f = only(check_with(PLAC_FORM_HEAD, text), "place-format")
+        self.assertEqual(f.kind, "fix")
 
     def test_no_space_after_comma_alone_is_fine(self):
         self.assertEqual(check(PLAC("Berlin,Preußen")), [])

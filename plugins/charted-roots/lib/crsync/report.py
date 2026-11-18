@@ -350,8 +350,8 @@ def render(cfg, tree, ged_path, person_plan, source_plan, event_match,
         counts = collections.Counter(f.group for f in found)
         for group in gedcheck.GROUPS:
             a(f"      {group:<12}{counts.get(group, 0):5}")
-        a(f"  run gedcom_check.py --ged {os.path.relpath(ged_path, cfg.root)} "
-          "for the fix list")
+        a(f"  run the validate-gedcom skill, or python3 <lib>/gedcom_check.py "
+          f"--ged {os.path.relpath(ged_path, cfg.root)}, for the fix list")
         a("")
 
     if blocked:

@@ -31,10 +31,10 @@ DEFAULT_GED = "FamilyTree.ged"
 DEFAULT_LIMIT = 20
 
 
-def _header(path: str, tree, host: str) -> list[str]:
+def _header(path: str, tree, host: str, digest: str) -> list[str]:
     lines = [f"GEDCOM:   {path}",
              f"Size:     {os.path.getsize(path):,} bytes",
-             f"SHA-256:  {report.sha256(path)}",
+             f"SHA-256:  {digest}",
              f"Host:     {host}",
              f"Exported: {tree.header.get('date') or '(no date in HEAD)'}"]
     lines += [f"WARNING {w}" for w in tree.warnings]
@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
              "findings": [asdict(f) for f in findings]},
             ensure_ascii=False, indent=2)
     else:
-        lines = _header(args.ged, tree, host) + [""]
+        lines = _header(args.ged, tree, host, digest) + [""]
         lines += _summary(findings) if findings else ["No findings."]
         lines += _details(findings, args.limit)
         text = "\n".join(lines)

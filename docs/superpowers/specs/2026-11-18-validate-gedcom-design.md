@@ -168,7 +168,9 @@ GEDCOM 5.5.1 date grammar, so `gedcheck` never relies on `from_gedcom`'s
   rank into the description; set PLAC to the place".
 - `place-format` — leading/trailing spaces, doubled spaces, a space before a
   comma, an empty component (`a, , b`) or a trailing comma → `fix` with the
-  cleaned string.
+  cleaned string. When the HEAD declares `1 PLAC` / `2 FORM` (recorded in
+  `tree.header["plac_form"]`), empty components are positional placeholders:
+  a string whose only issue is empty components is a `review` instead.
 - `place-variant` — distinct PLAC strings equal under `places.fold` +
   whitespace normalisation (case, accents, US-state abbreviations) → `fix`:
   "use one spelling; most used: X (n)". Ranked by use count, then by more

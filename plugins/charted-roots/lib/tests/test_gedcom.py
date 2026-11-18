@@ -291,6 +291,7 @@ class Parse(unittest.TestCase):
     def test_header(self):
         self.assertEqual(self.tree.header["version"], "5.5.1")
         self.assertEqual(self.tree.header["date"], "21 SEP 2026")
+        self.assertIn("plac_form", self.tree.header)
         self.assertTrue(self.tree.header["source"].startswith("Ancestry"))
 
     def test_individual_names(self):
