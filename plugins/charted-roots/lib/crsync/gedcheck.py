@@ -1,0 +1,228 @@
+"""Check a GEDCOM on its own, and say what to fix in the host service.
+
+Each check yields `Finding`s; `run` collects the groups asked for. Nothing
+here reads or writes the vault, and nothing writes the `.ged`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from . import gedcom
+from . import places
+
+GROUPS = ["duplicates", "marriages", "dates", "places"]   # also the report order
+CHECKS = {"dup-vital": "duplicates", "dup-event-exact": "duplicates",
+          "dup-marriage": "duplicates", "dup-family": "duplicates",
+          "marriage-on-person": "marriages",
+          "date-unreadable": "dates", "date-invalid": "dates",
+          "date-nonstandard": "dates", "date-order": "dates",
+          "place-non-place": "places", "place-format": "places",
+          "place-variant": "places", "place-hierarchy": "places"}
+
+VITAL = ("BIRT", "DEAT", "BURI", "CREM")
+
+
+@dataclass
+class Finding:
+    check: str
+    group: str
+    kind: str      #: "fix" | "review"
+    who: str
+    line: int
+    what: str
+    fix: str
+
+
+def host_name(tree) -> str:
+    """The service the export came from, for "fix it in ..." lines."""
+    source = (tree.header.get("source") or "").strip()
+    low = source.lower()
+    if "myheritage" in low:
+        return "MyHeritage"
+    if "ancestry" in low:
+        return "Ancestry"
+    if "familysearch" in low:
+        return "FamilySearch"
+    return source or "the tree's host"
+
+
+def _person(tree, xref: str) -> str:
+    ind = tree.individuals.get(xref)
+    return f"{ind.name or '(unnamed)'} (@{xref}@)" if ind else f"@{xref}@"
+
+
+def _family(tree, xref: str) -> str:
+    fam = tree.families.get(xref)
+    names = []
+    for p in ((fam.husband, fam.wife) if fam else ()):
+        ind = tree.individuals.get(p) if p else None
+        if ind:
+            names.append(ind.name or "(unnamed)")
+    return f"{' & '.join(names) or '(no partners)'} (@{xref}@)"
+
+
+def _spouses(tree, xref: str) -> list:
+    """(family xref, the other partner) for each family the person heads."""
+    ind = tree.individuals.get(xref)
+    out = []
+    for f in (ind.fams if ind else []):
+        fam = tree.families.get(f)
+        if fam is None:
+            continue
+        other = fam.wife if fam.husband == xref else fam.husband
+        out.append((f, _person(tree, other) if other else "no partner"))
+    return out
+
+
+def _label(ev) -> str:
+    return (ev.even_type or ev.tag) if ev.tag == "EVEN" else ev.tag
+
+
+def _where(ev) -> str:
+    return f"{ev.date_raw or '(undated)'} at {ev.place_raw or '(no place)'}"
+
+
+def _dup_vital(tree, host):
+    for ind in tree.individuals.values():
+        who = _person(tree, ind.xref)
+        for tag in VITAL:
+            evs = [e for e in ind.events if e.tag == tag]
+            if len(evs) < 2:
+                continue
+            keys = {(e.date_raw.strip(), places.key(e.place_raw)) for e in evs}
+            if len(keys) == 1:
+                yield Finding(
+                    "dup-vital", "duplicates", "fix", who, evs[1].line,
+                    f"{tag} recorded {len(evs)} times, identical "
+                    f"({_where(evs[0])})",
+                    f"in {host}: delete the duplicate {tag}")
+            else:
+                yield Finding(
+                    "dup-vital", "duplicates", "review", who, evs[1].line,
+                    f"{tag} recorded {len(evs)} times, differently: "
+                    + "; ".join(_where(e) for e in evs),
+                    f"in {host}: keep the correct {tag} and delete the others")
+
+
+def _dup_event_exact(tree, host):
+    owners = [(i.xref, _person(tree, i.xref), i.events)
+              for i in tree.individuals.values()]
+    owners += [(f.xref, _family(tree, f.xref), f.events)
+               for f in tree.families.values()]
+    for _, who, events in owners:
+        seen: dict = {}
+        for ev in events:
+            if ev.tag == "MARR" or ev.tag in VITAL:
+                continue
+            date, place = ev.date_raw.strip(), places.key(ev.place_raw)
+            if not date or not place:
+                continue
+            k = (ev.tag, ev.even_type, date, place)
+            if k in seen:
+                yield Finding(
+                    "dup-event-exact", "duplicates", "fix", who, ev.line,
+                    f"{_label(ev)} repeated exactly ({_where(ev)})",
+                    f"in {host}: delete the repeated {_label(ev)}")
+            seen[k] = ev
+
+
+def _dup_marriage(tree, host):
+    for fam in tree.families.values():
+        marrs = [e for e in fam.events if e.tag == "MARR"]
+        if len(marrs) < 2:
+            continue
+        same = all(gedcom._same_date(a.date, b.date)
+                   for i, a in enumerate(marrs) for b in marrs[i + 1:])
+        who = _family(tree, fam.xref)
+        if same:
+            yield Finding(
+                "dup-marriage", "duplicates", "fix", who, marrs[1].line,
+                f"marriage recorded {len(marrs)} times on the same date",
+                f"in {host}: delete the duplicate marriage")
+        else:
+            yield Finding(
+                "dup-marriage", "duplicates", "review", who, marrs[1].line,
+                f"marriage recorded {len(marrs)} times, differently: "
+                + "; ".join(_where(e) for e in marrs),
+                f"in {host}: keep the correct marriage and delete the others")
+
+
+def _dup_family(tree, host):
+    seen: dict = {}
+    for fam in tree.families.values():
+        if not (fam.husband and fam.wife):
+            continue
+        couple = tuple(sorted((fam.husband, fam.wife)))
+        first = seen.setdefault(couple, fam)
+        if first is not fam:
+            yield Finding(
+                "dup-family", "duplicates", "review", _family(tree, fam.xref),
+                fam.line,
+                f"same couple as family @{first.xref}@",
+                f"in {host}: merge the two families")
+
+
+def _duplicates(tree, host):
+    for gen in (_dup_vital, _dup_event_exact, _dup_marriage, _dup_family):
+        yield from gen(tree, host)
+
+
+def _marriages(tree, host):
+    for ind_ev, fam_ev in tree.folded:
+        partner = dict(_spouses(tree, ind_ev.owner)).get(fam_ev.owner, "")
+        what = f"duplicate of the family marriage @{fam_ev.owner}@" + \
+            (f" with {partner}" if partner else "")
+        fix = f"in {host}: delete the person-level marriage; the family " \
+              f"already holds it"
+        if ind_ev.place and fam_ev.place == ind_ev.place:
+            fix += (f" (make sure the family keeps the place "
+                    f"\"{ind_ev.place}\")")
+        elif ind_ev.place:
+            fix += (f" (the places differ: person \"{ind_ev.place}\", "
+                    f"family \"{fam_ev.place}\" -- keep the right one)")
+        yield Finding("marriage-on-person", "marriages", "fix",
+                      _person(tree, ind_ev.owner), ind_ev.line, what, fix)
+    for ev, why in tree.person_marriages:
+        spouses = _spouses(tree, ev.owner)
+        names = ", ".join(p for _, p in spouses)
+        if why == "no family":
+            fix = (f"in {host}: add the spouse, and record the marriage on "
+                   f"that family instead of on the person")
+        elif len(spouses) == 1:
+            fix = (f"in {host}: move the marriage onto the family with "
+                   f"{names}" + ("; date it" if why == "undated" else
+                                 ", or correct the date if it is the same marriage"))
+        else:
+            fix = (f"in {host}: move the marriage onto the right family "
+                   f"({names})" + ("; date it" if why == "undated" else ""))
+        yield Finding("marriage-on-person", "marriages", "review",
+                      _person(tree, ev.owner), ev.line,
+                      f"only on the person: {why}", fix)
+
+
+#: Adding a check group is one entry here.
+_RUNNERS = {"duplicates": _duplicates, "marriages": _marriages}
+
+
+def run(tree, only: set | None = None) -> list:
+    """Findings for the groups in `only` (default all), by group then line."""
+    host = host_name(tree)
+    out = []
+    for group in GROUPS:
+        if (only is not None and group not in only) or group not in _RUNNERS:
+            continue
+        out.extend(sorted(_RUNNERS[group](tree, host), key=lambda f: f.line))
+    return out
+
+
+def parse_only(value: str) -> set | None:
+    """`--only` text to a set of group names; None means every group."""
+    names = {p.strip().lower() for p in (value or "").split(",") if p.strip()}
+    if not names:
+        return None
+    bad = sorted(names - set(GROUPS))
+    if bad:
+        raise ValueError(f"unknown group {', '.join(bad)}; "
+                         f"valid groups: {', '.join(GROUPS)}")
+    return names
