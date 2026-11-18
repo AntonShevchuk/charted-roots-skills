@@ -1,17 +1,30 @@
 # charted-roots-skills
 
-Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault managed by the **Charted Roots** plugin.
+Claude Code skills for an [Obsidian](https://obsidian.md) genealogy vault managed by the [**Charted Roots**](https://chartedroots.com/) plugin.
 
 | Skill | Use |
 |---|---|
 | `add-archive-record` | One archival document → transcription, Source, Events, Citations, Person updates |
 | `research-ancestry` | Plan and run a kinship investigation; regional guides (former USSR, Russian Empire, Galicia/Bukovina, Bessarabia); draft archive requests |
 | `verify-vault` | Read-only consistency audit. Runs the shared toolkit in `lib/` (`crsync`, standard-library Python), which the other skills call too |
+| `validate-gedcom` | Check a GEDCOM export on its own (no vault needed): duplicate events, unreadable or non-standard dates, inconsistent place names, listed as fixes to make in the host tree |
 | `sync-gedcom` | Reconcile an upstream GEDCOM export without the duplicates the plugin's import wizard creates |
 | `organize-places` | Map a GEDCOM's historical place names to Place notes under modern borders, with the old names as aliases; reviewed in batches |
 | `init-vault` | One-time vault setup: `CLAUDE.md`, convention modules, project-scope plugin settings (run it as `/charted-roots:init-vault`) |
 
 ## Install
+
+### 1. Obsidian and Charted Roots
+
+1. Install [Obsidian](https://obsidian.md) and create (or open) a vault for your family tree.
+2. In Obsidian: **Settings → Community plugins → Browse**, search for **Charted Roots**, then **Install** and **Enable**. Pre-release builds and manual installs are described on [chartedroots.com](https://chartedroots.com/).
+
+**Starting a tree:**
+
+- **You have a GEDCOM (`.ged`) export** from Ancestry, MyHeritage or another host: check it with `validate-gedcom`, import it once with the plugin's import wizard, and use `sync-gedcom` for every later export.
+- **You have no tree in GEDCOM format:** start with yourself. Use the plugin's own interface to create your Person record, then add your parents and grandparents from there, one record at a time. The skills work on a vault built by hand just as well as on an imported one.
+
+### 2. The skills
 
 Install per vault (project scope), so the plugin is active only where it is needed. In the vault folder:
 
@@ -48,7 +61,7 @@ Requires Python 3.10+ for the scripts. Pillow is optional (`scan_montage.py` onl
 ## Notes
 
 - **Privacy.** A genealogy vault holds data on living people. The skills do no web search, upload or e-mail without your explicit instruction, and never send letters.
-- **GEDCOM.** `gedcom_sync.py` was written against Ancestry GEDCOM 5.5.1 exports. Other hosts may need adjustments; start with the dry run.
+- **GEDCOM.** `gedcom_sync.py` was written against Ancestry GEDCOM 5.5.1 exports and also reads MyHeritage exports. Other hosts may need adjustments; start with `gedcom_check.py` and the dry run.
 - **Tests.** `cd plugins/charted-roots/lib && python3 -m unittest discover -s tests -t .` All fixture names are fictional.
 
 ## License
