@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from dataclasses import dataclass, field
 
-from . import places, vault
+from . import gedcom, places, vault
 
 PLAN_PATH = "History/places-plan.json"
 VERSION = 1
@@ -132,3 +133,77 @@ def approved_placs(plan: Plan) -> set[str]:
         if target is not None and target.status in {"approved", "created"}:
             out.add(places.key(e.plac))
     return out
+
+
+def count_placs(tree: gedcom.Tree) -> Counter:
+    """How often each PLAC string occurs, one count per underlying event.
+
+    A marriage can sit on the FAM and again on a spouse's INDI; the parser
+    marks the INDI copy `folded` and has already moved its place onto the FAM
+    event, so only the FAM event counts.
+    """
+    counts: Counter = Counter()
+    for ind in tree.individuals.values():
+        for ev in ind.events:
+            if ev.place and not ev.folded:
+                counts[ev.place] += 1
+    for fam in tree.families.values():
+        for ev in fam.events:
+            if ev.place:
+                counts[ev.place] += 1
+    return counts
+
+
+@dataclass
+class ExtractResult:
+    added: list[str] = field(default_factory=list)
+    updated: list[str] = field(default_factory=list)
+    resolved: list[str] = field(default_factory=list)
+
+
+def _record_note(plan: Plan, index: places.Index, note, root: str) -> str:
+    """Record an existing Place note, and its ancestors, as created places."""
+    chain = [note] + index.ancestors(note)
+    keys = [n.scalar("cr_id") or n.basename for n in chain]
+    for i, n in enumerate(chain):
+        if keys[i] in plan.places:
+            continue
+        path = os.path.relpath(n.path, root) if root else n.path
+        plan.places[keys[i]] = PlannedPlace(
+            key=keys[i], title=n.scalar("title") or n.basename,
+            place_type=n.scalar("place_type") or "",
+            parent=keys[i + 1] if i + 1 < len(chain) else "",
+            aliases=list(n.as_list("aliases")), status="created",
+            cr_id=n.scalar("cr_id") or "", file=path.replace(os.sep, "/"))
+    return keys[0]
+
+
+def extract(plan: Plan, counts: Counter, index: places.Index,
+            root: str = "") -> ExtractResult:
+    """Fill the PLAC worklist from `counts`, never undoing a review.
+
+    An existing entry only has its count refreshed (0 when the string left
+    the export). A new string already found by the plugin's own lookups is
+    recorded as approved against that note; a non-place is marked; the rest
+    wait as proposed. `root` makes recorded file paths vault-relative.
+    """
+    res = ExtractResult()
+    for plac, entry in plan.plac.items():
+        n = counts.get(plac, 0)
+        if entry.count != n:
+            entry.count = n
+            res.updated.append(plac)
+    for plac, n in counts.items():
+        if plac in plan.plac:
+            continue
+        entry = PlacEntry(plac=plac, count=n)
+        note = index.find(plac)
+        if note is not None:
+            entry.place = _record_note(plan, index, note, root)
+            entry.status = "approved"
+            res.resolved.append(plac)
+        else:
+            entry.not_place = gedcom.non_place_reason(plac)
+        plan.plac[plac] = entry
+        res.added.append(plac)
+    return res
