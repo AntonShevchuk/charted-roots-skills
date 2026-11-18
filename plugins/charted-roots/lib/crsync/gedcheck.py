@@ -315,7 +315,7 @@ def _uses(n: int) -> str:
 def _places(tree, host):
     by_raw: dict = {}      # PLAC as written -> [(who, event)]
     for who, ev in _all_events(tree):
-        if ev.folded or not ev.place_raw.strip():
+        if not ev.place_raw.strip():
             continue
         by_raw.setdefault(ev.place_raw, []).append((who, ev))
 

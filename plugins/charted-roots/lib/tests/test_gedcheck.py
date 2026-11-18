@@ -269,14 +269,21 @@ class Places(unittest.TestCase):
         self.assertEqual(
             check(PLACS("Springfield, Illinois", "Springfield, Ohio")), [])
 
-    def test_folded_marriage_place_counted_once(self):
-        text = (
+    def _folded(self, plac):
+        return (
             "0 @I1@ INDI\n1 NAME Karl /Beispiel/\n1 FAMS @F1@\n"
-            "1 MARR\n2 DATE 1 JUN 1850\n2 PLAC Musterdorf ,\n"
+            f"1 MARR\n2 DATE 1 JUN 1850\n2 PLAC {plac}\n"
             "0 @I2@ INDI\n1 NAME Anna /Muster/\n1 FAMS @F1@\n"
             "0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n1 MARR\n"
-            "2 DATE 1 JUN 1850\n2 PLAC Musterdorf ,\n0 TRLR\n")
-        f = only(check(text), "place-format")
+            "2 DATE 1 JUN 1850\n0 TRLR\n")
+
+    def test_folded_marriage_place_counted_once(self):
+        f = only(check(self._folded("Musterdorf ,")), "place-format")
+        self.assertIn("(1 use)", f.what)
+
+    def test_folded_person_only_non_place_is_reported(self):
+        f = only(check(self._folded("Infanterie-Regiment 51")),
+                 "place-non-place")
         self.assertIn("(1 use)", f.what)
 
     def test_who_lists_three_then_and_more(self):
