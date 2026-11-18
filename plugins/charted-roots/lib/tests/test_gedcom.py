@@ -139,6 +139,87 @@ class Even(unittest.TestCase):
                 self.assertEqual(gedcom.classify_even(raw), want)
 
 
+EVEN_ALIASES = """0 HEAD
+1 SOUR MYHERITAGE
+1 GEDC
+2 VERS 5.5.1
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Jürgen /Muster/
+1 FAMS @F1@
+1 EVEN
+2 TYPE MARR
+2 DATE 5 APR 1898
+2 PLAC Musterdorf
+2 SOUR @S1@
+3 PAGE Heiratsregister Nr. 21
+1 EVEN
+2 TYPE Taufe
+2 DATE 9 MAR 1871
+1 EVEN
+2 TYPE Hochzeit
+2 DATE 1 JUN 1920
+1 EVEN
+2 TYPE Verlobung
+2 DATE 1 JAN 1898
+0 @I2@ INDI
+1 NAME Anna /Beispiel/
+1 FAMS @F1@
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 MARR
+2 DATE 5 APR 1898
+0 @S1@ SOUR
+1 TITL Heiratsregister Musterdorf
+0 TRLR
+"""
+
+
+class EvenAliases(unittest.TestCase):
+    """MyHeritage writes standard facts as `1 EVEN` + a `2 TYPE` label."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.path = ged(EVEN_ALIASES)
+        cls.tree = gedcom.parse(cls.path)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.unlink(cls.path)
+
+    def test_the_labels_classify_as_standard_facts(self):
+        for raw, want in [("MARR", "marriage"), ("marr", "marriage"),
+                          ("Hochzeit", "marriage"), ("Taufe", "baptism"),
+                          ("Taufe ", "baptism")]:
+            with self.subTest(raw):
+                self.assertEqual(gedcom.classify_even(raw), (want, "standard"))
+
+    def test_they_become_events_with_the_standard_tag(self):
+        events = {(e.tag, e.date) for e in self.tree.individuals["I1"].events}
+        self.assertIn(("BAPM", "1871-03-09"), events)
+        self.assertIn(("MARR", "1920-06-01"), events)
+
+    def test_a_marr_even_folds_into_the_family_marriage_it_repeats(self):
+        # Same date as the FAM MARR: one marriage, which gains the place.
+        on_person = [e for e in self.tree.individuals["I1"].events
+                     if e.tag == "MARR" and e.date == "1898-04-05"]
+        self.assertTrue(all(e.folded for e in on_person))
+        fam = [e for e in self.tree.families["F1"].events if e.tag == "MARR"]
+        self.assertEqual([(e.date, e.place) for e in fam],
+                         [("1898-04-05", "Musterdorf")])
+
+    def test_the_citation_and_label_are_kept(self):
+        ev = next(e for e in self.tree.individuals["I1"].events
+                  if e.date == "1898-04-05")
+        self.assertEqual(ev.citations, [("S1", "Heiratsregister Nr. 21")])
+        self.assertEqual(ev.even_type, "MARR")
+
+    def test_other_labels_are_still_set_aside(self):
+        self.assertEqual([(d, e.even_type) for d, e in self.tree.suppressed],
+                         [("unknown", "Verlobung")])
+
+
 class Parse(unittest.TestCase):
 
     @classmethod
@@ -283,6 +364,27 @@ class Encoding(unittest.TestCase):
         for case, head in heads.items():
             with self.subTest(case), self.assertRaises(UnicodeDecodeError):
                 self.parse_bytes(head + SPLIT_BODY)
+
+    def test_a_split_after_a_bare_text_line_is_rejoined(self):
+        # MyHeritage writes multi-line TEXT with raw line breaks instead of
+        # CONT, so the cut line can be a bare text line with no level; the
+        # CONC still continues the TEXT value above it.
+        body = (b"0 @I9@ INDI\r\n1 NAME Test /Person/\r\n1 SOUR @S1@\r\n"
+                b"2 DATA\r\n3 TEXT Birth: 1871\r\n"
+                b"Parents: \xd0\x97\xd0\xb0\xd0\xbf\xd0\xb8\xd1\r\n"
+                b"4 CONC \x81\xd0\xb0\xd0\xbd\xd0\xbe\r\n0 TRLR\r\n")
+        tree, messages, _ = self.parse_bytes(SPLIT_HEAD + body)
+        self.assertIn("I9", tree.individuals)
+        self.assertTrue(any("CONC" in m and "line(s): 13" in m for m in messages),
+                        messages)
+
+    def test_a_split_after_a_bare_line_under_an_unrelated_level_still_fails(self):
+        body = (b"0 @I9@ INDI\r\n1 NAME Test /Person/\r\n1 SOUR @S1@\r\n"
+                b"2 DATA\r\n3 TEXT Birth: 1871\r\n"
+                b"Parents: \xd0\x97\xd0\xb0\xd0\xbf\xd0\xb8\xd1\r\n"
+                b"2 CONC \x81\xd0\xb0\xd0\xbd\xd0\xbe\r\n0 TRLR\r\n")
+        with self.assertRaises(UnicodeDecodeError):
+            self.parse_bytes(SPLIT_HEAD + body)
 
     def test_unparseable_lines_are_counted_not_dropped_silently(self):
         tree, messages, _ = self.parse_bytes(

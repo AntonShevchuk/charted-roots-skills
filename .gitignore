@@ -5,3 +5,6 @@ __pycache__/
 .obsidian/
 .claude/worktrees/
 .superpowers/
+
+# Real GEDCOM exports hold data on living people; never commit them.
+*.ged

@@ -44,6 +44,11 @@ TAG_TO_EVENT = {
 #: Everything else is either a shared event counted once elsewhere, or a
 #: derivative record that the vault model says is a Source and never an Event.
 EVEN_TRAVEL = {"arrival": "immigration", "departure": "emigration"}
+#: `2 TYPE` labels that are a standard fact written as EVEN. MyHeritage
+#: exports some marriages as `1 EVEN` / `2 TYPE MARR`, and German-language
+#: trees label baptisms and weddings. They are read as that tag, so an
+#: individual marriage folds into the FAM marriage it repeats.
+EVEN_STANDARD = {"marr": "MARR", "hochzeit": "MARR", "taufe": "BAPM"}
 EVEN_DERIVATIVE_PREFIXES = ("obituary", "testament", "marriage license")
 #: A shared event yields one EVEN block per individual, so these must collapse
 #: to the single FAM-level Event rather than being counted per person.
@@ -180,9 +185,11 @@ def normalise_date(raw: str) -> tuple:
 def classify_even(even_type: str) -> tuple:
     """An EVEN block's `2 TYPE` -> (event_type|None, disposition).
 
-    Disposition is one of: travel, shared, derivative, unknown.
+    Disposition is one of: standard, travel, shared, derivative, unknown.
     """
     t = (even_type or "").strip().lower()
+    if t in EVEN_STANDARD:
+        return TAG_TO_EVENT[EVEN_STANDARD[t]], "standard"
     if t in EVEN_TRAVEL:
         return EVEN_TRAVEL[t], "travel"
     for prefix in EVEN_SHARED_PREFIXES:
@@ -258,7 +265,19 @@ def _join_conc_split_characters(raw: bytes) -> tuple:
             continue
         body = lines[index].rstrip(b"\r\n")
         previous = _BYTE_LINE.match(body)
-        if previous is None or not previous.group(3):
+        if previous is None:
+            # A bare text line: MyHeritage breaks multi-line values with raw
+            # newlines instead of CONT. It belongs to the nearest GEDCOM line
+            # above it, which is what the CONC must continue.
+            if not body.strip():
+                continue
+            back = index - 1
+            while back >= 0 and _BYTE_LINE.match(lines[back].rstrip(b"\r\n")) is None:
+                back -= 1
+            if back < 0:
+                continue
+            previous = _BYTE_LINE.match(lines[back].rstrip(b"\r\n"))
+        elif not previous.group(3):
             continue
         level, prev_level = int(conc.group(1)), int(previous.group(1))
         if previous.group(2) in (b"CONC", b"CONT"):
@@ -363,7 +382,9 @@ def _read_event(owner: str, node: Node) -> Event | None:
     if tag == "EVEN":
         even_type = node.val("TYPE")
         event_type, disposition = classify_even(even_type)
-        ev = Event(owner=owner, tag="EVEN", event_type=event_type or "",
+        tag = EVEN_STANDARD[even_type.strip().lower()] \
+            if disposition == "standard" else "EVEN"
+        ev = Event(owner=owner, tag=tag, event_type=event_type or "",
                    even_type=even_type)
         ev.shared = disposition == "shared"
     elif tag in TAG_TO_EVENT:

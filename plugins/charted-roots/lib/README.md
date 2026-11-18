@@ -208,6 +208,16 @@ record (`History/GEDCOM Reconciliation - Report.md` where the vault keeps
 `History/`) with the date and the export's sha, and they are recomputed rather than trusted. A dry run prints the
 current figures in a few seconds.
 
+## Other exporters
+
+Parsing targets Ancestry 5.5.1 exports; two MyHeritage habits are handled too.
+A UTF-8 character cut at a `CONC` boundary is rejoined in memory (the file is
+never rewritten), including after a bare text line, which MyHeritage writes
+instead of `CONT`; the run warns with the line numbers. A `1 EVEN` whose
+`2 TYPE` is `MARR` or `Hochzeit` is read as a marriage and `Taufe` as a
+baptism, so an individual marriage folds into the family marriage it repeats.
+Bare text lines themselves are still skipped and counted in a warning.
+
 ## Layout
 
     <lib>/gedcom_sync.py      sync CLI
