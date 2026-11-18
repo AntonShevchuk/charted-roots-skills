@@ -123,8 +123,11 @@ person. Host name comes from the HEAD (`report.host_name`, moved into
 - `dup-event-exact` — any other event tag repeated on one owner with the same
   date *and* place (both non-empty) → `fix`. Different values are never
   reported for repeatable tags.
-- `dup-marriage` — a FAM with more than one MARR: compatible dates
-  (`gedcom._same_date`) → `fix`; different → `review`.
+- `dup-marriage` — a FAM with more than one MARR. `what` lists every copy as
+  `date at place`. Identical `date` and `places.key(place)` on all copies →
+  `fix`: "delete the duplicate". Compatible but different dates
+  (`gedcom._same_date`) or different places → `review`: keep the copy with the
+  more precise date / with a place. Incompatible dates → `review`.
 - `dup-family` — two FAMs with the same couple (sorted INDI xrefs, both
   present) → `review`: "merge the two families".
 
@@ -167,13 +170,18 @@ GEDCOM 5.5.1 date grammar, so `gedcheck` never relies on `from_gedcom`'s
   comma, an empty component (`a, , b`) or a trailing comma → `fix` with the
   cleaned string.
 - `place-variant` — distinct PLAC strings equal under `places.fold` +
-  whitespace normalisation (case, accents) → `fix`: "use one spelling;
-  most used: X (n)". One finding per variant group, not per event.
+  whitespace normalisation (case, accents, US-state abbreviations) → `fix`:
+  "use one spelling; most used: X (n)". Ranked by use count, then by more
+  non-ASCII characters (the accented form), then alphabetically; when the top
+  count is shared the fix reads "use one spelling, e.g. X". One finding per
+  variant group, not per event.
 - `place-hierarchy` — same leaf where one string's parent chain is a strict
   subsequence of another's (`Berlin, Germany` vs `Berlin, Brandenburg,
   Germany`) → `review`: "standardise to the fuller form". Leaves with unrelated
   parents (`Springfield, Illinois` / `Springfield, Ohio`) are not reported.
-  Leaves and chains are compared after `places.fold`. A strict subsequence
+  Leaves and chains are compared after `places.fold`. Only the maximal fuller
+  forms are listed: a candidate that another candidate extends is dropped, so
+  nested forms give one finding per shorter string. A strict subsequence
   must not be empty, so a **bare leaf** is handled on its own
   *(builder's call)*:
   - exactly one fuller form → `fix`: "use <the fuller form>";

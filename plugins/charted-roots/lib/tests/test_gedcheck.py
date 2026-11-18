@@ -93,6 +93,33 @@ class Duplicates(unittest.TestCase):
         self.assertEqual(f.kind, "review")
         self.assertEqual(f.who, "Karl Beispiel & Anna Muster (@F1@)")
 
+    def test_marriage_differing_places_is_a_review(self):
+        text = COUPLE + (
+            "0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n"
+            "1 MARR\n2 DATE 1 JUN 1850\n2 PLAC Aachen\n"
+            "1 MARR\n2 DATE 1 JUN 1850\n2 PLAC Bonn\n0 TRLR\n")
+        f = only(check(text), "dup-marriage")
+        self.assertEqual(f.kind, "review")
+        self.assertIn("1 JUN 1850 at Aachen", f.what)
+        self.assertIn("1 JUN 1850 at Bonn", f.what)
+        self.assertIn("place", f.fix)
+
+    def test_marriage_compatible_but_different_dates_is_a_review(self):
+        text = COUPLE + (
+            "0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n"
+            "1 MARR\n2 DATE 1 JUN 1850\n2 PLAC Aachen\n"
+            "1 MARR\n2 DATE 1850\n2 PLAC Aachen\n0 TRLR\n")
+        f = only(check(text), "dup-marriage")
+        self.assertEqual(f.kind, "review")
+        self.assertIn("1850 at Aachen", f.what)
+        self.assertIn("more precise date", f.fix)
+
+    def test_vital_dates_differing_only_in_case_are_identical(self):
+        f = only(check(indi("1 BIRT", "2 DATE 1 Jun 1824", "2 PLAC Musterdorf",
+                            "1 BIRT", "2 DATE 1 JUN 1824", "2 PLAC Musterdorf")),
+                 "dup-vital")
+        self.assertEqual(f.kind, "fix")
+
     def test_two_families_for_one_couple(self):
         self.assertEqual(only(check(TWO_FAMS), "dup-family").kind, "review")
 
@@ -246,6 +273,50 @@ class Places(unittest.TestCase):
     def test_variant_tie_is_alphabetical(self):
         f = only(check(PLACS("musterdorf", "Musterdorf")), "place-variant")
         self.assertIn('"Musterdorf"', f.fix)
+
+    def test_variant_tie_prefers_the_accented_spelling(self):
+        f = only(check(PLACS("Curacao", "Curaçao")), "place-variant")
+        self.assertIn('e.g. "Curaçao"', f.fix)
+        self.assertNotIn("most used", f.fix)
+
+    def test_variant_with_a_clear_winner_keeps_most_used(self):
+        f = only(check(PLACS("Curacao", "Curacao", "Curaçao")), "place-variant")
+        self.assertIn('most used: "Curacao" (2)', f.fix)
+
+    def test_hierarchy_nested_forms_give_one_fix(self):
+        fs = [f for f in check(PLACS(
+            "Berlin", "Berlin, Germany", "Berlin, Brandenburg, Germany",
+            "Berlin, Brandenburg, Prussia, Germany"))
+            if f.check == "place-hierarchy" and f.what.startswith('"Berlin" ')]
+        self.assertEqual(len(fs), 1)
+        f = fs[0]
+        self.assertEqual(f.kind, "fix")
+        self.assertIn('use "Berlin, Brandenburg, Prussia, Germany"', f.fix)
+
+    def test_hierarchy_nested_chain_is_one_review(self):
+        fs = [f for f in check(PLACS(
+            "Berlin, Germany", "Berlin, Brandenburg, Germany",
+            "Berlin, Brandenburg, Prussia, Germany"))
+            if f.check == "place-hierarchy"]
+        self.assertEqual(len(fs), 2)
+        self.assertTrue(all("Prussia" in f.fix for f in fs))
+
+    def test_hierarchy_non_contiguous_subsequence(self):
+        f = only(check(PLACS("X, A, C", "X, A, B, C")), "place-hierarchy")
+        self.assertIn('"X, A, B, C"', f.fix)
+
+    def test_hierarchy_two_maximal_forms_is_a_review(self):
+        fs = [f for f in check(PLACS(
+            "Springfield", "Springfield, Illinois",
+            "Springfield, Illinois, USA", "Springfield, Ohio, USA"))
+            if f.check == "place-hierarchy"
+            and f.what.startswith('"Springfield" ')]
+        self.assertEqual(len(fs), 1)
+        f = fs[0]
+        self.assertEqual(f.kind, "review")
+        self.assertIn("Illinois, USA", f.fix)
+        self.assertIn("Ohio, USA", f.fix)
+        self.assertNotIn('"Springfield, Illinois"', f.fix)
 
     def test_hierarchy_fuller_form(self):
         f = only(check(PLACS("Berlin, Germany", "Berlin, Brandenburg, Germany")),

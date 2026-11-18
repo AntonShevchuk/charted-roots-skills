@@ -130,7 +130,7 @@ tree's host (`in Ancestry: ...`, from the HEAD `SOUR`).
 |---|---|---|---|
 | `dup-vital` | duplicates | fix / review | A person has two or more BIRT, DEAT, BURI or CREM; identical is a fix, differing a review |
 | `dup-event-exact` | duplicates | fix | A repeatable fact (RESI, CENS, EVEN ...) recorded twice with the same date and place |
-| `dup-marriage` | duplicates | fix / review | One family has two MARR; the same date is a fix, differing dates a review |
+| `dup-marriage` | duplicates | fix / review | One family has two MARR; identical date and place is a fix. Compatible but different dates, or different places, are a review that lists each copy and says which to keep |
 | `dup-family` | duplicates | review | Two families for the same couple |
 | `marriage-on-person` | marriages | fix / review | A marriage recorded on a person (MARR, or EVEN of type MARR). A fix when it duplicates a marriage already on the family; a review when it is only on the person (no family, undated, or ambiguous) |
 | `date-unreadable` | dates | fix | A date that cannot be read |
@@ -138,9 +138,9 @@ tree's host (`in Ancestry: ...`, from the HEAD `SOUR`).
 | `date-nonstandard` | dates | fix | A date the importer reads but GEDCOM does not allow (German months, ISO, `c.`, `About`, `December`); the finding gives the standard form. Letter case and a dot after a keyword (`Abt.`, `Bef.`, `BET.`) count as standard |
 | `date-order` | dates | review | Dates that cannot be right: death before birth, burial before death, birth before a parent's, a lifespan over 120 years |
 | `place-non-place` | places | fix | A PLAC that is a unit or rank, not a place |
-| `place-format` | places | fix | Stray spaces or commas in a PLAC |
-| `place-variant` | places | fix | One place written several ways (accents, case, spacing); names the most used |
-| `place-hierarchy` | places | fix / review | A place that is a subset of a fuller place with the same leaf. A bare leaf with one fuller candidate is a fix; anything else is a review |
+| `place-format` | places | fix | Stray spaces or commas in a PLAC (spacing variants go here, not to `place-variant`) |
+| `place-variant` | places | fix | One place written several ways (accents, case, US-state abbreviations such as `TX` / `Texas`); names the most used spelling, or suggests one (preferring the accented form) when the counts tie |
+| `place-hierarchy` | places | fix / review | A place that is a subset of a fuller place with the same leaf. Only the fullest forms are listed, so nested forms give one finding. A bare leaf with one fullest candidate is a fix; anything else is a review |
 
 Exit codes: 0 no findings; 1 findings; 2 the run could not start (bad flags,
 missing or unreadable GEDCOM).

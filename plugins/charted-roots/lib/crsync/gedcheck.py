@@ -92,7 +92,7 @@ def _dup_vital(tree, host):
             evs = [e for e in ind.events if e.tag == tag]
             if len(evs) < 2:
                 continue
-            keys = {(e.date_raw.strip(), places.key(e.place_raw)) for e in evs}
+            keys = {(e.date, e.precision, places.key(e.place_raw)) for e in evs}
             if len(keys) == 1:
                 yield Finding(
                     "dup-vital", "duplicates", "fix", who, evs[1].line,
@@ -134,20 +134,25 @@ def _dup_marriage(tree, host):
         marrs = [e for e in fam.events if e.tag == "MARR"]
         if len(marrs) < 2:
             continue
-        same = all(gedcom._same_date(a.date, b.date)
-                   for i, a in enumerate(marrs) for b in marrs[i + 1:])
+        compatible = all(gedcom._same_date(a.date, b.date)
+                         for i, a in enumerate(marrs) for b in marrs[i + 1:])
         who = _family(tree, fam.xref)
-        if same:
+        what = (f"marriage recorded {len(marrs)} times: "
+                + "; ".join(_where(e) for e in marrs))
+        if len({(e.date, places.key(e.place_raw)) for e in marrs}) == 1:
             yield Finding(
                 "dup-marriage", "duplicates", "fix", who, marrs[1].line,
-                f"marriage recorded {len(marrs)} times on the same date",
-                f"in {host}: delete the duplicate marriage")
+                what, f"in {host}: delete the duplicate marriage")
+        elif compatible:
+            yield Finding(
+                "dup-marriage", "duplicates", "review", who, marrs[1].line,
+                what, f"in {host}: keep the copy with the more precise date "
+                f"/ with a place, and delete the others")
         else:
             yield Finding(
                 "dup-marriage", "duplicates", "review", who, marrs[1].line,
-                f"marriage recorded {len(marrs)} times, differently: "
-                + "; ".join(_where(e) for e in marrs),
-                f"in {host}: keep the correct marriage and delete the others")
+                what, f"in {host}: keep the correct marriage and delete the "
+                f"others")
 
 
 def _dup_family(tree, host):
@@ -348,7 +353,8 @@ def _places(tree, host):
         groups.setdefault(places.fold(cleaned), []).append(cleaned)
 
     def ranked(strings):
-        return sorted(strings, key=lambda c: (-len(by_clean[c]), c))
+        return sorted(strings, key=lambda c: (
+            -len(by_clean[c]), -sum(ord(ch) > 127 for ch in c), c))
 
     reps = {}
     for fkey, strings in groups.items():
@@ -358,21 +364,29 @@ def _places(tree, host):
             continue
         uses = [u for c in strings for u in by_clean[c]]
         spell = ", ".join(f"\"{c}\" ({len(by_clean[c])})" for c in order)
+        if len(by_clean[order[0]]) == len(by_clean[order[1]]):
+            fix = f"in {host}: use one spelling, e.g. \"{order[0]}\""
+        else:
+            fix = (f"in {host}: use one spelling; most used: \"{order[0]}\" "
+                   f"({len(by_clean[order[0]])})")
         yield Finding(
             "place-variant", "places", "fix", _who(w for w, _ in uses),
-            line(uses), f"one place written {len(strings)} ways: {spell}",
-            f"in {host}: use one spelling; most used: \"{order[0]}\" "
-            f"({len(by_clean[order[0]])})")
+            line(uses), f"one place written {len(strings)} ways: {spell}", fix)
 
     parts = {f: tuple(places.fold(x) for x in rep.split(", "))
              for f, rep in reps.items()}
     for fkey, rep in sorted(reps.items()):
         leaf, chain = parts[fkey][0], parts[fkey][1:]
+        cands = [g for g in reps
+                 if g != fkey and parts[g][0] == leaf
+                 and len(parts[g]) > len(parts[fkey])
+                 and _subsequence(chain, parts[g][1:])]
+        # only the maximal forms: drop one that another candidate extends
         fuller = sorted(
-            reps[g] for g in reps
-            if g != fkey and parts[g][0] == leaf
-            and len(parts[g]) > len(parts[fkey])
-            and _subsequence(chain, parts[g][1:]))
+            reps[g] for g in cands
+            if not any(h != g and len(parts[h]) > len(parts[g])
+                       and _subsequence(parts[g][1:], parts[h][1:])
+                       for h in cands))
         if not fuller:
             continue
         uses = [u for c in groups[fkey] for u in by_clean[c]]
