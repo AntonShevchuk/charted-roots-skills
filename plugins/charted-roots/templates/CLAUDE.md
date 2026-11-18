@@ -11,9 +11,9 @@ The entity model, invariants, evidence chain, vocabularies, place and GEDCOM rul
 English is the working language for headings, labels, analysis, research prose and commits. Source material is **never translated in place** — the original stays verbatim and a translation is added beside it. Proper nouns, native-script names, archival designations, quoted record text and `aliases:` keep their original form; where a name has both, use the English form in prose and keep the native one in `aliases:` or parentheses.
 
 
-## House conventions (opt-in modules)
+## House conventions
 
-`/charted-roots:init-vault` copies the chosen modules into `.claude/conventions/` and keeps only their lines here.
+`/charted-roots:init-vault` copies `archive.md`, `source-collections.md` and the chosen opt-in modules into `.claude/conventions/` and keeps only their lines here.
 
 @.claude/conventions/source-collections.md
 @.claude/conventions/archive.md

@@ -22,25 +22,23 @@ Work in the project root (`${CLAUDE_PROJECT_DIR}`). It must contain `.obsidian/p
 
 ## 3. Propose modules
 
-Suggest each module from evidence in the vault, and say what the evidence is:
+`archive.md` and `source-collections.md` are always installed — every vault gets them, so they are not offered. Suggest each of the other modules from evidence in the vault, and say what the evidence is:
 
 | Module | Suggest when |
 |---|---|
-| `archive.md` | a `mediaFolders` entry holds scans next to same-named `.md` transcriptions |
-| `source-collections.md` | Sources named `Collection - …`, or Sources carrying `source_parent` |
 | `research.md` | `cr_type: research_project` notes with `Hypothesis - ` / `Survey - ` / `Reference - ` / `Search Plan - ` prefixes |
 | `letters.md` | a `Letters/` folder |
 | `history.md` | a `History/` folder |
 | `upstream-ancestry.md` | a `.ged` at the vault root exported from Ancestry (`1 SOUR Ancestry.com` in the header) |
 
-A module with no evidence is still offered — a new vault may want it. Ask once, as a single multi-select question, which modules to install, and which working language to use (default English).
+A module with no evidence is still offered — a new vault may want it. Ask once, as a single multi-select question, which of these four to install, and which working language to use (default English).
 
 ## 4. Show the plan
 
 List each file to create or change, with the full content of new files and a diff for changed ones:
 
-- **`CLAUDE.md`** — from `templates/CLAUDE.md`: keep the `@.claude/conventions/<module>.md` lines for the chosen modules only; set the Language section to the chosen language. With an existing `CLAUDE.md`, merge: keep every vault-specific line, add the missing sections, and mark the core-model duplicates from step 2.
-- **`.claude/conventions/<module>.md`** — a copy of each chosen template. An existing file that differs from the template is the vault's own version: keep it unless the user asks to replace it, and show the diff.
+- **`CLAUDE.md`** — from `templates/CLAUDE.md`: keep the `@.claude/conventions/<module>.md` lines for `archive.md`, `source-collections.md` and the chosen modules only; set the Language section to the chosen language. With an existing `CLAUDE.md`, merge: keep every vault-specific line, add the missing sections, and mark the core-model duplicates from step 2.
+- **`.claude/conventions/<module>.md`** — a copy of `archive.md`, `source-collections.md` and each chosen template. An existing file that differs from the template is the vault's own version: keep it unless the user asks to replace it, and show the diff.
 - **`.claude/settings.json`** — merge in, keeping every existing key:
 
   ```json

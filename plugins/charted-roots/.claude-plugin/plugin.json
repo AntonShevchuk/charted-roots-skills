@@ -1,7 +1,7 @@
 {
   "name": "charted-roots",
   "description": "Skills for Obsidian + Charted Roots genealogy vaults: add-archive-record, research-ancestry, verify-vault, sync-gedcom, init-vault",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": { "name": "Anton Shevchuk" },
   "repository": "https://github.com/AntonShevchuk/charted-roots-skills",
   "license": "MIT",

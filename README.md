@@ -33,7 +33,7 @@ Requires Python 3.10+ for the scripts. Pillow is optional (`scan_montage.py` onl
 
 - **Core rules** — `skills/verify-vault/references/charted-roots-model.md`: entity model, invariants, evidence chain, vocabularies, places, GEDCOM, date forms. A session-start hook loads it into every session started in a Charted Roots vault (detected by `.obsidian/plugins/charted-roots/data.json`) and outputs nothing elsewhere. It stays current with plugin updates; nothing is copied into the vault.
 - **Your `CLAUDE.md`** — house rules: working language, git habits, module imports. It overrides the core rules where they differ.
-- **Convention modules** — `.claude/conventions/*.md`, copied from `templates/conventions/`; each skill degrades when one is absent.
+- **Convention modules** — `.claude/conventions/*.md`, copied from `templates/conventions/`. `init-vault` always installs `archive.md` and `source-collections.md`; the rest are opt-in. Each skill degrades when one is absent.
 
 | Module | Adds |
 |---|---|
