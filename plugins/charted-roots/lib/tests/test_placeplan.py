@@ -466,5 +466,130 @@ class Check(VaultCase):
             os.path.join(self.root, placeplan.PLAN_PATH)))
 
 
+class Apply(VaultCase):
+    def _apply(self, plan, dry=False):
+        return placeplan.apply_plan(plan, self.cfg, dry=dry)
+
+    def _files(self):
+        return sorted(os.listdir(os.path.join(self.root, FOLDERS["places"])))
+
+    def test_the_wroclaw_chain_is_written(self):
+        plan = _chain()
+        res = self._apply(plan)
+        self.assertEqual(self._files(), [
+            "Lower Silesian Voivodeship.md", "Poland.md", "Wrocław.md"])
+        self.assertEqual(res.created, [
+            f"{FOLDERS['places']}/{n}.md" for n in
+            ("Poland", "Lower Silesian Voivodeship", "Wrocław")])
+        self.assertEqual(res.aliased, [])
+        text = self.read(f"{FOLDERS['places']}/Wrocław.md")
+        ids = {k: p.cr_id for k, p in plan.places.items()}
+        self.assertEqual(text, (
+            "---\n"
+            "cr_type: place\n"
+            f"cr_id: {ids['wroclaw']}\n"
+            "title: Wrocław\n"
+            "place_type: city\n"
+            'parent_place: "[[Lower Silesian Voivodeship]]"\n'
+            f"parent_place_id: {ids['lower-silesia']}\n"
+            "full_name: Wrocław, Lower Silesian Voivodeship, Poland\n"
+            "aliases:\n"
+            "  - Breslau\n"
+            "---\n"
+            "**Part of:** [[Lower Silesian Voivodeship]]\n"))
+        self.assertEqual(len(set(ids.values())), 3)
+        self.assertTrue(all(ids.values()))
+        for p in plan.places.values():
+            self.assertEqual(p.status, "created")
+        self.assertEqual(plan.places["wroclaw"].file,
+                         f"{FOLDERS['places']}/Wrocław.md")
+        self.assertEqual(placeplan.load(self.root).places["wroclaw"].cr_id,
+                         ids["wroclaw"])
+
+    def test_a_taken_basename_gets_the_parent(self):
+        old = frontmatter(cr_type="place", cr_id="old-111-old-111",
+                          title="Neustadt")
+        self.write(f"{FOLDERS['places']}/Neustadt.md", old)
+        plan = Plan(places={
+            "hesse": PlannedPlace(key="hesse", title="Hesse",
+                                  place_type="state", status="approved"),
+            "neustadt": PlannedPlace(
+                key="neustadt", title="Neustadt", place_type="city",
+                parent="hesse", status="approved"),
+            "kirche": PlannedPlace(
+                key="kirche", title="Kirchdorf", place_type="locality",
+                parent="neustadt", status="approved")})
+        self._apply(plan)
+        self.assertIn("Neustadt, Hesse.md", self._files())
+        folder = os.path.join(self.root, FOLDERS["places"])
+        note = vault.parse(os.path.join(folder, "Neustadt, Hesse.md"))
+        self.assertEqual(note.scalar("title"), "Neustadt")
+        child = vault.parse(os.path.join(folder, "Kirchdorf.md"))
+        self.assertEqual(child.scalar("parent_place"), "[[Neustadt, Hesse]]")
+        self.assertEqual(self.read(f"{FOLDERS['places']}/Neustadt.md"), old)
+
+    def test_an_approved_place_beats_an_earlier_proposed_one_to_the_name(self):
+        plan = Plan(places={
+            "first": PlannedPlace(key="first", title="Neustadt",
+                                  place_type="city", parent="other"),
+            "other": PlannedPlace(key="other", title="Other",
+                                  place_type="state"),
+            "hesse": PlannedPlace(key="hesse", title="Hesse",
+                                  place_type="state", status="approved"),
+            "second": PlannedPlace(key="second", title="Neustadt",
+                                   place_type="city", parent="hesse",
+                                   status="approved")})
+        self._apply(plan)
+        self.assertEqual(plan.places["second"].file,
+                         f"{FOLDERS['places']}/Neustadt.md")
+        self.assertEqual(plan.places["first"].status, "proposed")
+
+    def test_proposed_places_are_not_written(self):
+        plan = _chain(status="proposed")
+        res = self._apply(plan)
+        self.assertEqual(self._files(), [])
+        self.assertEqual((res.created, res.aliased), ([], []))
+        self.assertFalse(os.path.exists(
+            os.path.join(self.root, placeplan.PLAN_PATH)))
+
+    def test_an_existing_place_only_gains_aliases(self):
+        text = ("---\ncr_type: place\ncr_id: wro-111-wro-111\n"
+                "title: Wrocław\nplace_type: city\naliases:\n"
+                "  - Vratislav\n  - breslau\nnote_key:   spaced\n---\nBody\n")
+        path = self.write(f"{FOLDERS['places']}/Wrocław.md", text)
+        plan = Plan(places={"wroclaw": PlannedPlace(
+            key="wroclaw", title="Wrocław Renamed", place_type="region",
+            aliases=["Breslau", "Wratislavia"], status="approved",
+            cr_id="wro-111-wro-111")})
+        res = self._apply(plan)
+        self.assertEqual(res.created, [])
+        self.assertEqual(res.aliased, [f"{FOLDERS['places']}/Wrocław.md"])
+        with open(path, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), text.replace(
+                "  - breslau\n", "  - breslau\n  - Wratislavia\n"))
+        self.assertEqual(plan.places["wroclaw"].status, "created")
+
+    def test_a_second_apply_writes_nothing(self):
+        self._apply(_chain())
+        before = {n: self.read(f"{FOLDERS['places']}/{n}")
+                  for n in self._files()}
+        plan_text = self.read(placeplan.PLAN_PATH)
+        res = self._apply(placeplan.load(self.root))
+        self.assertEqual((res.created, res.aliased), ([], []))
+        self.assertEqual(before, {n: self.read(f"{FOLDERS['places']}/{n}")
+                                  for n in self._files()})
+        self.assertEqual(plan_text, self.read(placeplan.PLAN_PATH))
+
+    def test_dry_run_writes_nothing(self):
+        plan = _chain()
+        res = self._apply(plan, dry=True)
+        self.assertEqual(len(res.created), 3)
+        self.assertEqual(self._files(), [])
+        self.assertFalse(os.path.exists(
+            os.path.join(self.root, placeplan.PLAN_PATH)))
+        self.assertTrue(all(p.status == "approved" and not p.cr_id
+                            for p in plan.places.values()))
+
+
 if __name__ == "__main__":
     unittest.main()

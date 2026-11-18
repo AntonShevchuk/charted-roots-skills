@@ -426,3 +426,88 @@ def check(plan: Plan, cfg: config.Config, existing: list) -> list[str]:
                 f"{plac}: resolves to {where}, not its planned place "
                 f"{e.place!r} ('{want.basename}')")
     return problems
+
+
+# -- apply ---------------------------------------------------------------
+
+
+@dataclass
+class ApplyResult:
+    created: list[str] = field(default_factory=list)
+    aliased: list[str] = field(default_factory=list)
+
+
+def _merged_aliases(have: list, want: list) -> list:
+    """`have`, then each of `want` not already there (case-insensitive)."""
+    out, seen = list(have), {str(a).casefold() for a in have}
+    for a in want:
+        if isinstance(a, str) and a.casefold() not in seen:
+            out.append(a)
+            seen.add(a.casefold())
+    return out
+
+
+def apply_plan(plan: Plan, cfg: config.Config, dry: bool = True) -> ApplyResult:
+    """Write the approved places, parents before children.
+
+    A place whose `cr_id` names a note already in the places folder only gains
+    the aliases it lacks; any other approved place becomes a new note. A real
+    run then records `status`, `cr_id` and `file` on each place it handled and
+    saves the plan. Names come from `assign_basenames`, the same call `check`
+    makes, so the files written are the ones `check` validated.
+    """
+    res = ApplyResult()
+    existing = list(vault.iter_notes(cfg.places))
+    basenames = assign_basenames(plan, existing)
+    by_id = {n.scalar("cr_id"): n for n in existing if n.scalar("cr_id")}
+
+    taken_ids = set(by_id)
+    for folder in cfg.entity_folders.values():
+        if folder != cfg.places:
+            taken_ids |= {n.scalar("cr_id") for n in vault.iter_notes(folder)
+                          if n.scalar("cr_id")}
+    taken_ids |= {p.cr_id for p in plan.places.values() if p.cr_id}
+
+    todo = [p for p in plan.places.values() if p.status == "approved"]
+    # Stable, so plan order holds within a depth.
+    todo.sort(key=lambda p: len(_chain(plan, p)))
+
+    cr_ids = {k: p.cr_id for k, p in plan.places.items()
+              if p.status == "created" and p.cr_id}
+    notes = {}
+    for p in todo:
+        note = by_id.get(p.cr_id) if p.cr_id else None
+        if note is not None:
+            notes[p.key] = note
+            cr_ids[p.key] = p.cr_id
+        else:
+            cr_ids[p.key] = create.mint_cr_id(taken_ids)
+
+    def rel(path: str) -> str:
+        return os.path.relpath(path, cfg.root).replace(os.sep, "/")
+
+    handled = {}
+    for p in todo:
+        if p.key in notes:
+            note = notes[p.key]
+            merged = _merged_aliases(note.as_list("aliases"), p.aliases)
+            if merged != note.as_list("aliases"):
+                res.aliased.append(rel(note.path))
+                if not dry:
+                    note.set("aliases", merged)
+                    note.save()
+            handled[p.key] = rel(note.path)
+        else:
+            path = os.path.join(cfg.places, basenames[p.key] + ".md")
+            res.created.append(rel(path))
+            if not dry:
+                vault.write_atomic(
+                    path, render_note(p, plan, basenames, cr_ids))
+            handled[p.key] = rel(path)
+
+    if not dry and handled:
+        for key, path in handled.items():
+            place = plan.places[key]
+            place.status, place.cr_id, place.file = "created", cr_ids[key], path
+        save(cfg.root, plan)
+    return res

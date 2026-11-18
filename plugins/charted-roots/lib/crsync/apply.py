@@ -152,7 +152,8 @@ CLEAN = "entity folders are clean in git"
 
 def check_preconditions(cfg, require_restore_point: bool = True,
                         allow_obsidian: bool = False,
-                        allow_dirty: bool = False) -> list:
+                        allow_dirty: bool = False,
+                        tag_prefix: str = "pre-gedcom-sync") -> list:
     checks = []
 
     running = obsidian_running()
@@ -197,11 +198,11 @@ def check_preconditions(cfg, require_restore_point: bool = True,
                 "another way back."))
         else:
             restore = [t for t in tag_out.splitlines()
-                       if t.startswith("pre-gedcom-sync")]
+                       if t.startswith(tag_prefix)]
             checks.append(Precondition(
                 "a restore point tags HEAD", bool(restore),
                 restore[0] if restore else "none",
-                f"git tag pre-gedcom-sync-$(date +%Y%m%d-%H%M)  "
+                f"git tag {tag_prefix}-$(date +%Y%m%d-%H%M)  "
                 f"# then re-run. The script never tags on your behalf."))
     return checks
 
