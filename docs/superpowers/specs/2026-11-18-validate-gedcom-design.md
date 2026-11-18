@@ -149,12 +149,13 @@ GEDCOM 5.5.1 date grammar, so `gedcheck` never relies on `from_gedcom`'s
   `datetime.date` → `fix`.
 - `date-nonstandard` — label `lenient`: anything GEDCOM 5.5.1 doesn't define,
   such as German month names, `D.M.YYYY`, ISO, `c.`/`ca.`/`circa`/`~`,
-  `YYYY-YYYY`, full or dotted month names (`December`, `Dec.`), spelled-out or
-  dotted keywords (`About`, `Abt.`, `BET.`) → `fix`, with the suggested
-  standard form (`25 DEC 1914`, `ABT 1804`, `BET 1850 AND 1858`).
-  **Letter case alone is not flagged** (`25 Dec 1914` is fine), so an export
-  that writes months in mixed case doesn't flag nearly every date.
-  *(builder's call)*
+  `YYYY-YYYY`, full or dotted month names (`December`, `Dec.`), spelled-out
+  keywords (`About`, `Before`, `After`) → `fix`, with the suggested standard
+  form (`25 DEC 1914`, `ABT 1804`, `BET 1850 AND 1858`).
+  **Letter case alone is not flagged** (`25 Dec 1914` is fine), and neither is
+  a trailing dot on a GEDCOM keyword (`Abt.`, `Bef.`, `BET. … AND`, `CAL.`,
+  `EST.`): Ancestry writes them everywhere, so they count as standard like
+  case does. *(builder's call)*
 - `date-order` — death before birth; burial/cremation before death; a child
   born before a parent's birth; lifespan over 120 years. Compared on the
   earliest/latest bounds so `ABT`/ranges do not false-positive → `review`.

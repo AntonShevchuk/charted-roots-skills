@@ -41,6 +41,9 @@ _DMY_TEXT = re.compile(r'^(\d{1,2})\s*([^\W\d_]{3})[^\W\d_]*\.?\s*(\d{3,4})$')
 _MY_TEXT = re.compile(r'^([^\W\d_]{3})[^\W\d_]*\.?\s+(\d{3,4})$')
 _DMY_DOTS = re.compile(r'^(\d{1,2})\.(\d{1,2})\.(\d{4})$')
 _YEAR_SPAN = re.compile(r'^(\d{4})\s*-\s*(\d{4})$')
+#: Range forms, matched against the upper-cased text.
+_BET_AND = re.compile(r'^BET\.?\s+(.+?)\s+AND\s+(.+)$')
+_FROM_TO = re.compile(r'^FROM\s+(.+?)\s+TO\s+(.+)$')
 
 
 def single(text: str) -> tuple | None:
@@ -100,9 +103,7 @@ def from_gedcom(raw: str) -> tuple:
         return "", "unknown"
     d = raw.strip()
     up = d.upper()
-    m = (re.match(r'^BET\.?\s+(.+?)\s+AND\s+(.+)$', up)
-         or re.match(r'^FROM\s+(.+?)\s+TO\s+(.+)$', up)
-         or _YEAR_SPAN.match(d))
+    m = _BET_AND.match(up) or _FROM_TO.match(up) or _YEAR_SPAN.match(d)
     if m:
         span = _span(m.group(1), m.group(2))
         if span:
@@ -127,7 +128,7 @@ def meaning(value) -> tuple | None:
     if not v:
         return None
     up = v.upper()
-    m = (re.match(r'^BET\.?\s+(.+?)\s+AND\s+(.+)$', up)
+    m = (_BET_AND.match(up)
          or re.match(r'^(?:FROM\s+)?(.+?)\s+TO\s+(.+)$', up)
          or _YEAR_SPAN.match(v))
     if m:
@@ -168,15 +169,17 @@ _G_STRICT = re.compile(
 _G_UNPARSED = re.compile(
     r'^(?:\(.*\)|INT\s+.+\(.*\)|@#D.*|(?:FROM|TO)\s+%s)$' % _G_DATE, re.I)
 _G_BC = re.compile(r'B\.C\.?$', re.I)
-_G_DUAL = re.compile(r'(?<!\d)\d{3,4}/\d{2}(?!\d)')
+_G_DUAL = re.compile(r'(?<![\d/])\d{3,4}/\d{2}(?![\d/])')
+#: `Abt.` / `BET.` and friends: a dot after a GEDCOM keyword counts like case.
+_G_KEYWORD_DOT = re.compile(
+    r'\b(ABT|BEF|AFT|CAL|EST|BET|AND|FROM|TO|INT)\.(?=\s|$)', re.I)
 _CAL_EST = re.compile(r'^(CAL|EST)(?![A-Z])')
 
 
 def _read(d: str) -> tuple | None:
     """Mirror `from_gedcom`: (qualifier, range kind, [single results]) or None."""
     up = d.upper()
-    for kind, m in (("BET", re.match(r'^BET\.?\s+(.+?)\s+AND\s+(.+)$', up)),
-                    ("FROM", re.match(r'^FROM\s+(.+?)\s+TO\s+(.+)$', up)),
+    for kind, m in (("BET", _BET_AND.match(up)), ("FROM", _FROM_TO.match(up)),
                     ("SPAN", _YEAR_SPAN.match(d))):
         if m:
             parts = [single(m.group(1)), single(m.group(2))]
@@ -226,7 +229,7 @@ def classify(raw: str) -> tuple:
     qual, kind, parts = read
     if not all(_on_calendar(p[0]) for p in parts):
         return "invalid", ""
-    if _G_STRICT.match(d):
+    if _G_STRICT.match(_G_KEYWORD_DOT.sub(r'\1', d)):
         return "standard", ""
     spelled = [_spell(p) for p in parts]
     if kind:

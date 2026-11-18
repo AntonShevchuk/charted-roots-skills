@@ -135,7 +135,7 @@ tree's host (`in Ancestry: ...`, from the HEAD `SOUR`).
 | `marriage-on-person` | marriages | fix / review | A marriage recorded on a person (MARR, or EVEN of type MARR). A fix when it duplicates a marriage already on the family; a review when it is only on the person (no family, undated, or ambiguous) |
 | `date-unreadable` | dates | fix | A date that cannot be read |
 | `date-invalid` | dates | fix | A date that is not a real calendar day |
-| `date-nonstandard` | dates | fix | A date the importer reads but GEDCOM does not allow; the finding gives the standard form |
+| `date-nonstandard` | dates | fix | A date the importer reads but GEDCOM does not allow (German months, ISO, `c.`, `About`, `December`); the finding gives the standard form. Letter case and a dot after a keyword (`Abt.`, `Bef.`, `BET.`) count as standard |
 | `date-order` | dates | review | Dates that cannot be right: death before birth, burial before death, birth before a parent's, a lifespan over 120 years |
 | `place-non-place` | places | fix | A PLAC that is a unit or rank, not a place |
 | `place-format` | places | fix | Stray spaces or commas in a PLAC |

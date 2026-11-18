@@ -179,6 +179,11 @@ class Dates(unittest.TestCase):
         self.assertIn('"25 DEC 1914"', only(fs, "date-nonstandard").fix)
         self.assertTrue(only(fs, "date-unreadable").fix.startswith("in Ancestry: "))
 
+    def test_dotted_keywords_are_standard(self):
+        fs = check(indi("1 BIRT", "2 DATE Abt. 1942", "2 PLAC Musterdorf",
+                        "1 DEAT", "2 DATE Bef. 17 Nov 1980", "2 PLAC Musterdorf"))
+        self.assertEqual([f for f in fs if f.check == "date-nonstandard"], [])
+
     def test_suppressed_even_dates_are_checked(self):
         f = only(check(indi("1 EVEN", "2 TYPE Obituary", "2 DATE 25 Dez 1914")),
                  "date-nonstandard")
