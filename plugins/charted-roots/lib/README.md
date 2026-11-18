@@ -122,6 +122,8 @@ key, or `not_place`, or `unidentified`; `status` `proposed` / `approved`).
     python3 <lib>/places_plan.py apply                  # dry run
     python3 <lib>/places_plan.py apply --apply          # write approved places
 
+Alias matching ignores diacritics (`ł`, `ß`), so an accent-only variant (`Wroclaw` for `Wrocław`) needs no alias; a different spelling (`Muenchen` for `München`) still does.
+
 `extract` adds only strings not yet in the plan and refreshes counts; it never
 drops a reviewed entry. `check` fails on a missing parent, a cycle, an invalid
 `place_type`, a duplicate title under one parent (the last two skip entries recorded

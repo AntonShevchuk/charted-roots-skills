@@ -303,5 +303,60 @@ class UnapprovedAliasNeverLinks(AliasCase):
                          [("birth_place", "[[Wrocław]]")])
 
 
+class Fold(unittest.TestCase):
+
+    def test_accent_and_letter_variants_fold_together(self):
+        self.assertEqual(places.fold("Wrocław"), places.fold("wroclaw"))
+        self.assertEqual(places.fold("Preußen"), places.fold("PREUSSEN"))
+        self.assertEqual(places.fold("Łódź"), places.fold("Lodz"))
+        self.assertEqual(places.fold("Malmö"), "malmo")
+
+    def test_a_different_spelling_does_not_fold(self):
+        self.assertNotEqual(places.fold("Muenchen"), places.fold("München"))
+
+
+class FoldedAliasMatch(PlaceCase):
+
+    def setUp(self):
+        super().setUp()
+        self.place("Poland", title="Poland", full_name="Poland",
+                   place_type="country", aliases=["Polska"])
+        self.place("Lower Silesian Voivodeship",
+                   title="Lower Silesian Voivodeship",
+                   full_name="Lower Silesian Voivodeship, Poland",
+                   place_type="state", parent_place='"[[Poland]]"',
+                   aliases=["Dolnośląskie"])
+        self.place("Wrocław", title="Wrocław",
+                   full_name="Wrocław, Lower Silesian Voivodeship, Poland",
+                   place_type="city",
+                   parent_place='"[[Lower Silesian Voivodeship]]"')
+
+    PLAC = "Wroclaw, Dolnoslaskie, Polska"
+
+    def load(self, approved):
+        return places.load(self.cfg.places, approved=approved)
+
+    def test_an_approved_accent_free_form_resolves(self):
+        idx = self.load({places.key(self.PLAC)})
+        self.assertEqual(idx.find(self.PLAC).basename, "Wrocław")
+
+    def test_unapproved_it_does_not(self):
+        self.assertIsNone(self.load(set()).find(self.PLAC))
+        self.assertIsNone(self.load(None).find(self.PLAC))
+
+    def test_two_notes_folding_to_one_leaf_tie(self):
+        self.place("Wroclaw", title="Wroclaw",
+                   full_name="Wroclaw, Lower Silesian Voivodeship, Poland",
+                   place_type="city",
+                   parent_place='"[[Lower Silesian Voivodeship]]"')
+        idx = self.load({places.key(self.PLAC)})
+        self.assertIsNone(idx.find(self.PLAC))
+
+    def test_the_plugin_lookup_stays_exact(self):
+        self.place("Wrocław Pl", title="Wrocław Pl",
+                   full_name="Wrocław, Poland", place_type="city")
+        self.assertIsNone(self.load(None).find("Wroclaw, Poland"))
+
+
 if __name__ == "__main__":
     unittest.main()

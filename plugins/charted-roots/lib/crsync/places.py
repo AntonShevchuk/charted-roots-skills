@@ -62,6 +62,21 @@ def key(place: str) -> str:
     return unicodedata.normalize("NFC", normalise(place)).casefold()
 
 
+_FOLD = str.maketrans({"ł": "l", "ß": "ss", "ø": "o", "đ": "d", "ð": "d",
+                       "þ": "th", "æ": "ae", "œ": "oe", "ı": "i"})
+
+
+def fold(place: str) -> str:
+    """`key()` with diacritics removed, for alias matching only.
+
+    Never use it for what is written, for the approved-set check or for the
+    plugin's own lookups, which must stay exact.
+    """
+    base = unicodedata.normalize("NFKD", key(place))
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return base.translate(_FOLD)
+
+
 def note_is(note, target: str) -> bool:
     """Whether `note` is the place a target names: its `cr_id`, else its file.
 
@@ -153,7 +168,7 @@ class Index:
             self._by_name: dict = {}
             self._above: dict = {}
             for n in self.notes:
-                for name in self.names(n):
+                for name in self.names(n, True):
                     self._by_name.setdefault(name, []).append(n)
         return self._by_name, self._above
 
@@ -164,13 +179,13 @@ class Index:
         a name of an ancestor adds a point. A tie is no link.
         """
         by_name, above_of = self._alias_tables()
-        rest = [key(p) for p in parts[1:]]
+        rest = [fold(p) for p in parts[1:]]
         scored = []
-        for n in by_name.get(key(parts[0]), []):
+        for n in by_name.get(fold(parts[0]), []):
             if n.path not in above_of:
                 above = set()
                 for a in self.ancestors(n):
-                    above |= self.names(a)
+                    above |= self.names(a, True)
                 above_of[n.path] = above
             above = above_of[n.path]
             scored.append((sum(1 for r in rest if r in above), n))
@@ -203,11 +218,16 @@ class Index:
         return out
 
     @staticmethod
-    def names(note) -> set:
-        """Every name a Place note answers to, as match keys."""
+    def names(note, fold_marks: bool = False) -> set:
+        """Every name a Place note answers to, as match keys.
+
+        `fold_marks` ignores diacritics (see `fold`); only the alias fallback
+        asks for it.
+        """
         forms = [note.scalar("title"), note.scalar("name"), note.basename,
                  *note.as_list("aliases"), *note.as_list("historical_names")]
-        return {key(f) for f in forms if f}
+        k = fold if fold_marks else key
+        return {k(f) for f in forms if f}
 
     def compare(self, link: str, plac: str) -> str:
         """How a GEDCOM PLAC relates to the Place a vault value links to.

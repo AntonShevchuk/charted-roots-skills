@@ -56,6 +56,7 @@ Exit codes: 0 ok; 1 problems found or the write refused; 2 the run could not sta
 Run `extract` again: it adds only the strings not yet in the plan. A new string is never linked through an alias until the user has approved it, so propose just those, as above. Also look for:
 
 - **Missing aliases**: a Place the export names in a form it lacks. `extract` records every existing Place it resolves as a `created` entry with its `cr_id`. Add the missing form to that entry's `aliases` in the plan, together with the approved PLAC string that needs it if there is one; `check` validates the new alias and the string in the same batch. On the user's approval run `check`, then `apply --apply`. It adds the aliases the note lacks (case-insensitive, existing order kept) and changes nothing else on it; a second run writes nothing.
+- **Accent-only variants**: alias matching ignores diacritics (`ł`, `ß`), so `Wroclaw` or `Preussen` needs no alias for `Wrocław` or `Preußen`; a different spelling (`Muenchen` vs `München`) still does.
 - **Likely duplicates**: propose a merge to the user under the core model's merge rule, one merge at a time with their approval. `apply` never merges.
 - **An existing Place on a historical chain** (a `Preußen` country note): do not parent new Places under it and do not create a modern twin. Propose a re-parent, retitle or merge to the user instead. The scripts do not guard this; it is on you.
 
