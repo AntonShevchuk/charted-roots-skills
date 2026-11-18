@@ -239,8 +239,8 @@ class Places(unittest.TestCase):
         self.assertIn('"Wrocław, Polska" (2)', f.fix)
 
     def test_variant_tie_is_alphabetical(self):
-        f = only(check(PLACS("b place", "A place")), "place-variant")
-        self.assertIn('"A place"', f.fix)
+        f = only(check(PLACS("musterdorf", "Musterdorf")), "place-variant")
+        self.assertIn('"Musterdorf"', f.fix)
 
     def test_hierarchy_fuller_form(self):
         f = only(check(PLACS("Berlin, Germany", "Berlin, Brandenburg, Germany")),
